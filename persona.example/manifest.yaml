@@ -1,0 +1,16 @@
+schema_version: 1
+persona_version: "example-0.1.0"
+status: "example"
+example_only: true
+approved: false
+approved_by: null
+approved_at: null
+last_verified_at: null
+style_mode: "first_person"
+required_files:
+  - profile.yaml
+  - projects.yaml
+  - voice_rules.yaml
+  - boundaries.yaml
+  - qa_pairs.md
+  - system_prompt.md

@@ -1,0 +1,10 @@
+**
+!.dockerignore
+!backend/
+!backend/Dockerfile
+!backend/pyproject.toml
+!backend/uv.lock
+!backend/app/
+!backend/app/**
+!persona.example/
+!persona.example/**

@@ -1,0 +1,10 @@
+schema_version: 1
+example_only: true
+perspective: "first_person"
+tone: "clear and friendly"
+sentence_length: "short"
+directness: "direct"
+detail_level: "concise"
+humor_style: "light and optional"
+emoji_usage: "rare"
+language_switching: "follow the user's language"

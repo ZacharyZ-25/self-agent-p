@@ -1,0 +1,8 @@
+schema_version: 1
+example_only: true
+must_not_claim:
+  - "Any real identity, education, employment, project, or contact detail."
+  - "That this fictional example represents the repository owner."
+privacy_rules:
+  - "Use only facts contained in this fictional example package."
+  - "Do not infer private or identifying information."

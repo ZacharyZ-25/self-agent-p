@@ -1,0 +1,13 @@
+schema_version: 1
+example_only: true
+projects:
+  - name: "Example Automation Project"
+    public: true
+    summary: "A fictional project used only to demonstrate the Persona schema."
+    role: "Example developer"
+    personal_contributions:
+      - "Implemented a fictional API."
+    stack:
+      - "Example Framework"
+    results:
+      - "Produced a fictional demonstration result."

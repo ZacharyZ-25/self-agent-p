@@ -1,0 +1,15 @@
+{
+  "name": "self-agent-widget",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Browser tests for the dependency-free Example Candidate chat widget",
+  "scripts": {
+    "build": "node scripts/build-static.mjs",
+    "test": "playwright test",
+    "test:browser": "playwright test",
+    "test:size": "node tests/size-check.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1"
+  }
+}

@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <meta name="description" content="选择 Example Candidate 的专业人格或闲聊人格，进入独立的 AI 数字分身对话。">
+    <link rel="icon" href="data:,">
+    <title>Example Candidate — AI Digital Twin</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --page-ink: #1d1d1f;
+        --page-muted: #6e6e73;
+        --page-blue: #087cf0;
+        --page-background: #f5f5f7;
+        --page-glow-blue: rgb(126 225 255 / .12);
+        --page-glow-green: rgb(149 236 105 / .1);
+      }
+      :root[data-theme="light"] { color-scheme: light; }
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --page-ink: #f5f5f7;
+        --page-muted: #a1a1a6;
+        --page-blue: #64d2ff;
+        --page-background: #000;
+        --page-glow-blue: rgb(44 135 174 / .16);
+        --page-glow-green: rgb(65 135 54 / .12);
+      }
+      * { box-sizing: border-box; }
+      html { min-width: 320px; background: var(--page-background); }
+      body {
+        min-width: 320px;
+        min-height: 100svh;
+        margin: 0;
+        overflow-x: hidden;
+        color: var(--page-ink);
+        background:
+          radial-gradient(circle at 82% 18%, var(--page-glow-blue), transparent 30%),
+          radial-gradient(circle at 74% 88%, var(--page-glow-green), transparent 28%),
+          var(--page-background);
+      }
+      button, a { font: inherit; }
+      a { color: inherit; }
+      a:focus-visible {
+        border-radius: 4px;
+        outline: 3px solid var(--page-blue);
+        outline-offset: 4px;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      .site-shell {
+        width: min(1280px, calc(100% - 48px));
+        min-height: 100svh;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+      }
+      .site-header {
+        min-height: 82px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 11px;
+        color: inherit;
+        text-decoration: none;
+      }
+      .brand-mark {
+        position: relative;
+        width: 38px;
+        height: 38px;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        border: 1px solid rgb(255 255 255 / .72);
+        border-radius: 13px;
+        color: white;
+        background: linear-gradient(145deg, #7ee1ff, #0a84ff 48%, #7065ff);
+        box-shadow: 0 8px 20px rgb(10 132 255 / .2), inset 0 1px 0 rgb(255 255 255 / .65);
+        font-size: 12px;
+        font-weight: 850;
+      }
+      .brand-mark::after {
+        content: "";
+        position: absolute;
+        inset: 2px 4px 54%;
+        border-radius: 999px;
+        background: linear-gradient(180deg, rgb(255 255 255 / .8), transparent);
+        opacity: .58;
+      }
+      .brand-copy { display: grid; gap: 1px; }
+      .brand-name { font-size: 13px; font-weight: 790; }
+      .brand-label { color: var(--page-muted); font-size: 9px; font-weight: 760; letter-spacing: .12em; }
+      .header-meta {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        color: var(--page-muted);
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .header-meta a { text-underline-offset: 4px; }
+      .persona-status { display: inline-flex; align-items: center; gap: 7px; }
+      .persona-status::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #32d74b;
+        box-shadow: 0 0 0 3px rgb(50 215 75 / .13);
+      }
+      .hero {
+        flex: 1;
+        display: grid;
+        grid-template-columns: minmax(0, .82fr) minmax(480px, .92fr);
+        align-items: center;
+        gap: clamp(56px, 7vw, 108px);
+        padding: 20px 0 42px;
+      }
+      .intro {
+        min-height: 680px;
+        display: grid;
+        place-items: center;
+        animation: intro-in 600ms cubic-bezier(.2, .8, .2, 1) both;
+      }
+      .greeting {
+        position: relative;
+        width: 100%;
+        min-height: clamp(150px, 19vw, 250px);
+        display: grid;
+        place-items: center;
+        margin: 0;
+        font-size: clamp(88px, 10.5vw, 154px);
+        font-weight: 590;
+        line-height: .92;
+        letter-spacing: -.072em;
+      }
+      .greeting-word {
+        grid-area: 1 / 1;
+        opacity: 1;
+        transform: scale(1);
+        transition: opacity 360ms ease, transform 360ms ease;
+        will-change: opacity, transform;
+      }
+      .greeting-word.is-changing { opacity: 0; transform: scale(.985); }
+      .chat-stage {
+        width: min(100%, 560px);
+        justify-self: end;
+        animation: chat-in 620ms 90ms cubic-bezier(.2, .8, .2, 1) both;
+      }
+      @keyframes intro-in { from { opacity: 0; } }
+      @keyframes chat-in { from { opacity: 0; transform: scale(.97); } }
+      @media (max-width: 960px) {
+        .site-shell { width: min(760px, calc(100% - 36px)); }
+        .hero { grid-template-columns: 1fr; gap: 28px; padding-top: 12px; }
+        .chat-stage { grid-row: 1; width: 100%; max-width: 620px; justify-self: center; }
+        .intro { grid-row: 2; min-height: 360px; }
+        .greeting { font-size: clamp(86px, 18vw, 136px); }
+      }
+      @media (max-width: 560px) {
+        .site-shell { width: calc(100% - 20px); }
+        .site-header { min-height: 74px; }
+        .header-meta a { display: none; }
+        .persona-status { font-size: 9px; }
+        .hero { gap: 24px; padding: 8px 0 28px; }
+        .intro { min-height: 260px; }
+        .greeting { min-height: 120px; font-size: clamp(70px, 25vw, 104px); }
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme]) {
+          --page-ink: #f5f5f7;
+          --page-muted: #a1a1a6;
+          --page-blue: #64d2ff;
+          --page-background: #000;
+          --page-glow-blue: rgb(44 135 174 / .16);
+          --page-glow-green: rgb(65 135 54 / .12);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: .01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: .01ms !important;
+        }
+        .greeting-word { opacity: 1; transform: none; }
+      }
+    </style>
+    <script defer src="./chat-widget.js"></script>
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="site-header">
+        <a class="brand" href="https://example.com" aria-label="Example Candidate homepage">
+          <span class="brand-mark" aria-hidden="true">AI</span>
+          <span class="brand-copy">
+            <span class="brand-name">Example Candidate</span>
+            <span class="brand-label">AI DIGITAL TWIN</span>
+          </span>
+        </a>
+        <div class="header-meta">
+          <span class="persona-status">FICTIONAL PERSONA example-0.1.0</span>
+          <a href="https://example.com">example.com</a>
+        </div>
+      </header>
+
+      <main class="hero">
+        <section class="intro" aria-labelledby="page-title">
+          <h1 class="greeting" id="page-title">
+            <span class="sr-only">你好 / Hello / Hallo</span>
+            <span class="greeting-word" aria-hidden="true" lang="zh-CN">你好</span>
+          </h1>
+        </section>
+
+        <section class="chat-stage" aria-label="AI digital twin chat">
+          <agent-chat-widget
+            id="main-chat"
+            api-base="http://localhost:8000"
+            layout="stage"
+            start-open
+            persona-mode
+            theme="auto"
+            locale="auto"
+          ></agent-chat-widget>
+        </section>
+      </main>
+    </div>
+    <script>
+      (() => {
+        const word = document.querySelector(".greeting-word");
+        const chat = document.querySelector("#main-chat");
+        const root = document.documentElement;
+        const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+        const greetings = [
+          { text: "你好", lang: "zh-CN" },
+          { text: "Hello", lang: "en" },
+          { text: "Hallo", lang: "de" },
+        ];
+        let index = 0;
+        let intervalId;
+        let changeId;
+
+        const syncPageTheme = ({ preference, resolvedTheme } = {}) => {
+          const resolved = resolvedTheme || chat.dataset.resolvedTheme;
+          if (resolved !== "light" && resolved !== "dark") return;
+          root.dataset.theme = resolved;
+          root.dataset.themePreference = preference || chat.dataset.themePreference || "auto";
+        };
+
+        const show = (greeting) => {
+          word.textContent = greeting.text;
+          word.lang = greeting.lang;
+        };
+        const stop = () => {
+          window.clearInterval(intervalId);
+          window.clearTimeout(changeId);
+          word.classList.remove("is-changing");
+        };
+        const start = () => {
+          stop();
+          if (motion.matches) {
+            index = 0;
+            show(greetings[index]);
+            return;
+          }
+          intervalId = window.setInterval(() => {
+            word.classList.add("is-changing");
+            changeId = window.setTimeout(() => {
+              index = (index + 1) % greetings.length;
+              show(greetings[index]);
+              word.classList.remove("is-changing");
+            }, 380);
+          }, 3000);
+        };
+
+        chat.addEventListener("agent-theme-change", (event) => syncPageTheme(event.detail));
+        customElements.whenDefined("agent-chat-widget").then(() => syncPageTheme());
+        motion.addEventListener?.("change", start);
+        start();
+      })();
+    </script>
+  </body>
+</html>

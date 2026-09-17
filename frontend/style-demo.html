@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:,">
+    <title>Chat Widget Theme & Locale Demo</title>
+    <style>
+      body { min-height: 100vh; margin: 0; padding: 32px; font-family: system-ui, sans-serif; background: radial-gradient(circle at 16% 22%, #89ddff 0, transparent 30%), radial-gradient(circle at 80% 28%, #c6adff 0, transparent 30%), radial-gradient(circle at 68% 88%, #b5ef95 0, transparent 32%), #f1f6fb; background-attachment: fixed; }
+      h1 { margin: 0 0 8px; }
+      p { color: #526075; }
+    </style>
+    <script defer src="./chat-widget.js"></script>
+  </head>
+  <body>
+    <h1>Theme / locale preview</h1>
+    <p>Use the language selector and theme button in the widget header.</p>
+    <agent-chat-widget
+      api-base="http://127.0.0.1:8000"
+      title="Example Candidate"
+      theme="light"
+      locale="en"
+      position="bottom-left"
+    ></agent-chat-widget>
+  </body>
+</html>

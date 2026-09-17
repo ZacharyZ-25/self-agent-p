@@ -1,0 +1,26 @@
+schema_version: 1
+example_only: true
+identity:
+  display_name: "Example Candidate"
+  current_status: "Fictional software engineering student"
+  one_line_intro_zh: "我是一个完全虚构的示例候选人。"
+  one_line_intro_en: "I am a completely fictional example candidate."
+  languages:
+    - language: "Example Language"
+      level: "Example"
+education:
+  - institution: "Example University"
+    program: "Example Program"
+skills:
+  expert:
+    - "Example Skill A"
+  proficient:
+    - "Example Skill B"
+career:
+  target_roles:
+    - "Example Engineer"
+contact:
+  website: "https://example.com"
+  github: "https://github.com/example"
+  linkedin: null
+  email_public: "candidate@example.com"
