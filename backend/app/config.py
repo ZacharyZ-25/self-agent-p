@@ -83,6 +83,15 @@ class Settings(BaseSettings):
     max_llm_concurrency: int = Field(default=20, ge=1, le=1000)
     trusted_proxy_ips: str = ""
 
+    rag_enabled: bool = False
+    database_url: SecretStr | None = None
+    rag_top_k: int = Field(default=5, ge=1, le=10)
+    rag_context_token_budget: int = Field(default=3000, ge=100, le=12000)
+    rag_timeout_seconds: float = Field(default=2, gt=0, le=10)
+    rag_max_concurrency: int = Field(default=4, ge=1, le=32)
+    kb_admin_enabled: bool = False
+    kb_admin_password: SecretStr | None = None
+
     log_level: str = "INFO"
     log_raw_conversations: bool = False
 
@@ -230,7 +239,20 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_security_invariants(self) -> Settings:
+        if self.kb_admin_enabled and (
+            not self.rag_enabled or self.database_url is None or not self.kb_admin_password
+            or not self.kb_admin_password.get_secret_value()
+        ):
+            raise ValueError(
+                "KB_ADMIN_ENABLED needs RAG_ENABLED, DATABASE_URL and KB_ADMIN_PASSWORD"
+            )
         if self.is_production:
+            if self.rag_enabled and self.database_url is None:
+                raise ValueError("Production RAG_ENABLED needs the public DATABASE_URL")
+            if self.kb_admin_enabled:
+                raise ValueError(
+                    "KB_ADMIN_ENABLED is local-only until production identity is configured"
+                )
             origins = self.allowed_origins
             if not origins or len(origins) != len(set(origins)):
                 raise ValueError("production CORS_ORIGINS requires unique explicit HTTPS origins")

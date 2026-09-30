@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: kb_dev
+      POSTGRES_PASSWORD: kb_local_only
+      POSTGRES_DB: kb_dev
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - ../knowledge-data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kb_dev -d kb_dev"]
+      interval: 3s
+      timeout: 3s
+      retries: 15

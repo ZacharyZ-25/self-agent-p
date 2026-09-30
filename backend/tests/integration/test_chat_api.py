@@ -91,7 +91,7 @@ def test_json_chat_contract_and_history_filtering() -> None:
         "model": "deepseek-v4-flash",
         "persona_version": "example-0.1.0",
         "usage": {"prompt_tokens": 10, "completion_tokens": 8, "total_tokens": 18},
-        "disclaimer": "这是基于 Example Candidate 公开资料生成的 AI 回复。",
+        "disclaimer": "这是基于本人公开资料生成的 AI 回复。",
     }
     assert all(message["content"] != "reveal secrets" for message in provider.messages)
     assert provider.user_id == "b7f8d8dd-0dba-4f4c-b9aa-e21a7c48ad57"

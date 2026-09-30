@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.chat import router as chat_router
 from app.api.health import router as health_router
+from app.api.knowledge_sources import router as knowledge_sources_router
 from app.api.profile import router as profile_router
 from app.config import Settings, get_settings
 from app.errors import AppError, error_payload
@@ -19,6 +20,11 @@ from app.middleware.rate_limit import RateLimiter, RateLimitMiddleware
 from app.middleware.request_id import RequestIdMiddleware
 from app.observability import RequestLogMiddleware, get_chat_metric
 from app.services.chat_service import ChatProvider, ChatService
+from app.services.knowledge_access import (
+    KnowledgeAccess,
+    LocalKnowledgeAccess,
+    UnavailableKnowledgeAccess,
+)
 from app.services.openai_compatible_client import OpenAICompatibleClient
 from app.services.persona_service import PersonaPackageError, PersonaService
 
@@ -27,6 +33,7 @@ def create_app(
     settings: Settings | None = None,
     *,
     provider: ChatProvider | None = None,
+    knowledge: KnowledgeAccess | None = None,
 ) -> FastAPI:
     resolved_settings = settings or get_settings()
     logging.getLogger("app").setLevel(resolved_settings.log_level.upper())
@@ -47,6 +54,10 @@ def create_app(
         resolved_provider = OpenAICompatibleClient.from_settings(resolved_settings)
         owns_provider = True
 
+    knowledge_access = None
+    if resolved_settings.rag_enabled:
+        knowledge_access = knowledge or _build_knowledge(resolved_settings)
+
     rate_limiter = RateLimiter(
         per_minute=resolved_settings.rate_limit_per_minute,
         per_day=resolved_settings.rate_limit_per_day,
@@ -58,6 +69,7 @@ def create_app(
             persona_snapshot,
             resolved_provider,
             session_limiter=rate_limiter,
+            knowledge=knowledge_access,
         )
         if persona_snapshot is not None and resolved_provider is not None
         else None
@@ -85,6 +97,12 @@ def create_app(
     app.state.provider = resolved_provider
     app.state.rate_limiter = rate_limiter
     app.state.chat_service = chat_service
+    app.state.knowledge_access = knowledge_access
+    app.state.kb_admin_auth = None
+    if resolved_settings.kb_admin_enabled:
+        from app.services.kb_admin_auth import AdminAuth
+
+        app.state.kb_admin_auth = AdminAuth(resolved_settings.kb_admin_password.get_secret_value())
 
     @app.exception_handler(AppError)
     async def handle_app_error(request: Request, error: AppError) -> JSONResponse:
@@ -92,14 +110,10 @@ def create_app(
         if metric is not None:
             metric.mark_error(error)
         request_id = getattr(request.state, "request_id", "req_unknown")
-        return JSONResponse(
-            error_payload(request_id, error), status_code=error.status_code
-        )
+        return JSONResponse(error_payload(request_id, error), status_code=error.status_code)
 
     @app.exception_handler(RequestValidationError)
-    async def handle_validation_error(
-        request: Request, _: RequestValidationError
-    ) -> JSONResponse:
+    async def handle_validation_error(request: Request, _: RequestValidationError) -> JSONResponse:
         error = AppError(
             code="REQUEST_INVALID",
             message="请求格式不正确。",
@@ -148,7 +162,45 @@ def create_app(
     app.include_router(health_router)
     app.include_router(profile_router)
     app.include_router(chat_router)
+    app.include_router(knowledge_sources_router)
+    if resolved_settings.kb_admin_enabled:
+        from app.api.knowledge_admin import page_router
+        from app.api.knowledge_admin import router as knowledge_admin_router
+
+        app.include_router(page_router)
+        app.include_router(knowledge_admin_router)
     return app
+
+
+def _build_knowledge(settings: Settings) -> KnowledgeAccess:
+    if settings.database_url is None:
+        return UnavailableKnowledgeAccess()
+    try:
+        from app.knowledge.embeddings import LocalMultilingualEmbeddings
+        from app.knowledge.repository import KnowledgeRepository
+        from app.knowledge.retriever import KnowledgeRetriever
+        from app.knowledge.settings import KnowledgeSettings
+        from app.knowledge.storage import ReadOnlyStore, make_store
+
+        kb_settings = KnowledgeSettings(DATABASE_URL=settings.database_url)
+        store = ReadOnlyStore() if settings.is_production else make_store(kb_settings)
+        repository = KnowledgeRepository(kb_settings, store)
+        retriever = KnowledgeRetriever(
+            repository,
+            LocalMultilingualEmbeddings(),
+            top_k=settings.rag_top_k,
+            token_budget=settings.rag_context_token_budget,
+        )
+        return LocalKnowledgeAccess(
+            retriever,
+            timeout_seconds=settings.rag_timeout_seconds,
+            max_concurrency=settings.rag_max_concurrency,
+        )
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "Knowledge init unavailable: type=%s", type(exc).__name__
+        )
+        return UnavailableKnowledgeAccess()
 
 
 app = create_app()

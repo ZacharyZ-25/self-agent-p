@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 from app.errors import AppError, service_not_ready_error
 from app.models.chat import ChatRequest, ChatResponse
 from app.observability import get_chat_metric
-from app.services.chat_service import ChatService
+from app.services.chat_service import ChatDone, ChatService, ChatSources
 from app.services.provider import ProviderDelta, ProviderDone, ProviderUsage
 
 router = APIRouter(prefix="/api/v1", tags=["chat"])
@@ -23,7 +23,7 @@ def _chat_service(request: Request) -> ChatService:
     return service
 
 
-@router.post("/chat", response_model=ChatResponse)
+@router.post("/chat", response_model=ChatResponse, response_model_exclude_none=True)
 async def chat(payload: ChatRequest, request: Request) -> ChatResponse:
     metric = get_chat_metric(request)
     if metric is not None:
@@ -44,6 +44,9 @@ async def chat(payload: ChatRequest, request: Request) -> ChatResponse:
         model=result.model,
         persona_version=service.persona.persona_version,
         usage=result.usage,
+        sources=list(result.sources) if getattr(result, "sources", None) is not None else None,
+        knowledge_version=getattr(result, "knowledge_version", None),
+        knowledge_status=getattr(result, "knowledge_status", None),
     )
 
 
@@ -63,9 +66,18 @@ async def chat_stream(payload: ChatRequest, request: Request) -> StreamingRespon
                 "persona_version": service.persona.persona_version,
             },
         )
+        upstream = service.stream(payload)
         try:
-            async for event in service.stream(payload):
-                if isinstance(event, ProviderDelta):
+            async for event in upstream:
+                if isinstance(event, ChatSources):
+                    data: dict[str, object] = {
+                        "sources": [source.model_dump(mode="json") for source in event.sources],
+                        "knowledge_status": event.knowledge_status,
+                    }
+                    if event.knowledge_version is not None:
+                        data["knowledge_version"] = event.knowledge_version
+                    yield _sse("sources", data)
+                elif isinstance(event, ProviderDelta):
                     if metric is not None:
                         metric.mark_first_token()
                     yield _sse("delta", {"text": event.text})
@@ -77,6 +89,16 @@ async def chat_stream(payload: ChatRequest, request: Request) -> StreamingRespon
                     if metric is not None:
                         metric.mark_completed()
                     yield _sse("done", {"finish_reason": event.finish_reason})
+                elif isinstance(event, ChatDone):
+                    if metric is not None:
+                        metric.mark_completed()
+                    yield _sse(
+                        "done",
+                        {
+                            "finish_reason": event.finish_reason,
+                            "source_ids": list(event.source_ids),
+                        },
+                    )
         except asyncio.CancelledError:
             if metric is not None:
                 metric.mark_cancelled()
@@ -95,9 +117,7 @@ async def chat_stream(payload: ChatRequest, request: Request) -> StreamingRespon
             )
         except Exception:
             if metric is not None:
-                metric.mark_error(
-                    AppError("INTERNAL_ERROR", "服务暂时不可用。", 500, True)
-                )
+                metric.mark_error(AppError("INTERNAL_ERROR", "服务暂时不可用。", 500, True))
             yield _sse(
                 "error",
                 {
@@ -107,6 +127,8 @@ async def chat_stream(payload: ChatRequest, request: Request) -> StreamingRespon
                     "retryable": True,
                 },
             )
+        finally:
+            await upstream.aclose()
 
     return StreamingResponse(
         events(),

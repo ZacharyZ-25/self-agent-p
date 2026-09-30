@@ -1,1 +1,1 @@
-"""Example Candidate Digital Twin API package."""
+"""Local RAG API package."""

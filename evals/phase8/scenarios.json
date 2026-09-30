@@ -1,0 +1,325 @@
+{
+  "fixture_version": "1.0",
+  "scenarios": [
+    {
+      "id": "atlas_initial",
+      "initial_active_versions": [
+        "paper-v1"
+      ],
+      "operations": [
+        {
+          "action": "publish",
+          "version": "atlas-v1"
+        }
+      ],
+      "expected_public_versions": [
+        "paper-v1",
+        "atlas-v1"
+      ],
+      "expected_owner_preview_versions": [
+        "paper-v1",
+        "atlas-v1"
+      ],
+      "authorized_historical_versions": [],
+      "review_versions": []
+    },
+    {
+      "id": "atlas_updated",
+      "initial_active_versions": [
+        "paper-v1",
+        "atlas-v1"
+      ],
+      "operations": [
+        {
+          "action": "replace",
+          "version": "atlas-v2"
+        }
+      ],
+      "expected_public_versions": [
+        "paper-v1",
+        "atlas-v2"
+      ],
+      "expected_owner_preview_versions": [
+        "paper-v1",
+        "atlas-v2"
+      ],
+      "authorized_historical_versions": [],
+      "review_versions": []
+    },
+    {
+      "id": "atlas_late_archive",
+      "initial_active_versions": [
+        "paper-v1",
+        "atlas-v2"
+      ],
+      "operations": [
+        {
+          "action": "upload_archive",
+          "version": "atlas-stale-v1"
+        }
+      ],
+      "expected_public_versions": [
+        "paper-v1",
+        "atlas-v2"
+      ],
+      "expected_owner_preview_versions": [
+        "paper-v1",
+        "atlas-v2"
+      ],
+      "authorized_historical_versions": [],
+      "review_versions": []
+    },
+    {
+      "id": "atlas_failed_replace",
+      "initial_active_versions": [
+        "paper-v1",
+        "atlas-v1"
+      ],
+      "operations": [
+        {
+          "action": "replace_failed",
+          "version": "atlas-v2"
+        }
+      ],
+      "expected_public_versions": [
+        "paper-v1",
+        "atlas-v1"
+      ],
+      "expected_owner_preview_versions": [
+        "paper-v1",
+        "atlas-v1"
+      ],
+      "authorized_historical_versions": [],
+      "review_versions": []
+    },
+    {
+      "id": "atlas_history",
+      "initial_active_versions": [
+        "paper-v1",
+        "atlas-v2"
+      ],
+      "operations": [
+        {
+          "action": "authorize_history",
+          "version": "atlas-v1"
+        }
+      ],
+      "expected_public_versions": [
+        "paper-v1",
+        "atlas-v2"
+      ],
+      "expected_owner_preview_versions": [
+        "paper-v1",
+        "atlas-v2"
+      ],
+      "authorized_historical_versions": [
+        "atlas-v1"
+      ],
+      "review_versions": []
+    },
+    {
+      "id": "private_ready",
+      "initial_active_versions": [
+        "paper-v1",
+        "atlas-v2"
+      ],
+      "operations": [
+        {
+          "action": "ready_private",
+          "version": "private-v1"
+        }
+      ],
+      "expected_public_versions": [
+        "paper-v1",
+        "atlas-v2"
+      ],
+      "expected_owner_preview_versions": [
+        "paper-v1",
+        "atlas-v2",
+        "private-v1"
+      ],
+      "authorized_historical_versions": [],
+      "review_versions": []
+    },
+    {
+      "id": "identity_review",
+      "initial_active_versions": [
+        "paper-v1"
+      ],
+      "operations": [
+        {
+          "action": "review",
+          "version": "identity-conflict-v1"
+        }
+      ],
+      "expected_public_versions": [
+        "paper-v1"
+      ],
+      "expected_owner_preview_versions": [
+        "paper-v1"
+      ],
+      "authorized_historical_versions": [],
+      "review_versions": [
+        "identity-conflict-v1"
+      ]
+    },
+    {
+      "id": "beacon_private_ready",
+      "initial_active_versions": [
+        "paper-v1",
+        "beacon-v2"
+      ],
+      "operations": [
+        {
+          "action": "ready_private",
+          "version": "beacon-private-v1"
+        }
+      ],
+      "expected_public_versions": [
+        "paper-v1",
+        "beacon-v2"
+      ],
+      "expected_owner_preview_versions": [
+        "paper-v1",
+        "beacon-v2",
+        "beacon-private-v1"
+      ],
+      "authorized_historical_versions": [],
+      "review_versions": []
+    },
+    {
+      "id": "beacon_updated",
+      "initial_active_versions": [
+        "paper-v1",
+        "beacon-v1"
+      ],
+      "operations": [
+        {
+          "action": "replace",
+          "version": "beacon-v2"
+        }
+      ],
+      "expected_public_versions": [
+        "paper-v1",
+        "beacon-v2"
+      ],
+      "expected_owner_preview_versions": [
+        "paper-v1",
+        "beacon-v2"
+      ],
+      "authorized_historical_versions": [],
+      "review_versions": []
+    },
+    {
+      "id": "beacon_conflict",
+      "initial_active_versions": [
+        "paper-v1",
+        "beacon-v2"
+      ],
+      "operations": [
+        {
+          "action": "publish",
+          "version": "beacon-conflict-v1"
+        }
+      ],
+      "expected_public_versions": [
+        "paper-v1",
+        "beacon-v2",
+        "beacon-conflict-v1"
+      ],
+      "expected_owner_preview_versions": [
+        "paper-v1",
+        "beacon-v2",
+        "beacon-conflict-v1"
+      ],
+      "authorized_historical_versions": [],
+      "review_versions": []
+    },
+    {
+      "id": "beacon_injection",
+      "initial_active_versions": [
+        "paper-v1",
+        "beacon-v2"
+      ],
+      "operations": [
+        {
+          "action": "publish",
+          "version": "injection-v1"
+        }
+      ],
+      "expected_public_versions": [
+        "paper-v1",
+        "beacon-v2",
+        "injection-v1"
+      ],
+      "expected_owner_preview_versions": [
+        "paper-v1",
+        "beacon-v2",
+        "injection-v1"
+      ],
+      "authorized_historical_versions": [],
+      "review_versions": []
+    },
+    {
+      "id": "beacon_withdrawn",
+      "initial_active_versions": [
+        "paper-v1",
+        "beacon-v2"
+      ],
+      "operations": [
+        {
+          "action": "unpublish",
+          "version": "beacon-v2"
+        }
+      ],
+      "expected_public_versions": [
+        "paper-v1"
+      ],
+      "expected_owner_preview_versions": [
+        "paper-v1",
+        "beacon-v2"
+      ],
+      "authorized_historical_versions": [],
+      "review_versions": []
+    },
+    {
+      "id": "beacon_deleted",
+      "initial_active_versions": [
+        "paper-v1",
+        "beacon-v2"
+      ],
+      "operations": [
+        {
+          "action": "delete",
+          "version": "beacon-v2"
+        }
+      ],
+      "expected_public_versions": [
+        "paper-v1"
+      ],
+      "expected_owner_preview_versions": [
+        "paper-v1"
+      ],
+      "authorized_historical_versions": [],
+      "review_versions": []
+    },
+    {
+      "id": "paper_only",
+      "initial_active_versions": [],
+      "operations": [
+        {
+          "action": "publish",
+          "version": "paper-v1"
+        }
+      ],
+      "expected_public_versions": [
+        "paper-v1"
+      ],
+      "expected_owner_preview_versions": [
+        "paper-v1"
+      ],
+      "authorized_historical_versions": [],
+      "review_versions": []
+    }
+  ]
+}

@@ -39,6 +39,7 @@
       stopped: "已停止生成。",
       resetDone: "本地会话已重置。",
       responseReady: "新回复已完成。",
+      sources: "资料来源",
       chars: "{count}/2000",
       errors: {
         OFFLINE: "当前没有网络连接。恢复网络后可以重试。",
@@ -72,14 +73,15 @@
       language: "Interface language",
       theme: "Change theme, current: {value}",
       themes: { auto: "System", light: "Light", dark: "Dark" },
-      emptyTitle: "Hi, I’m Example Candidate’s AI twin.",
+      emptyTitle: "Hi, I’m the owner’s AI twin.",
       quickTitle: "Try one of these",
       conversation: "Conversation",
-      fullDisclaimer: "I am an AI twin built from Example Candidate’s approved public information. AI responses may be wrong; verify important details with him.",
+      fullDisclaimer: "I am an AI twin built from the owner’s approved public information. AI responses may be wrong; verify important details with him.",
       disclaimerShort: "AI-generated · Verify important details with me",
       stopped: "Generation stopped.",
       resetDone: "Local session reset.",
       responseReady: "New response complete.",
+      sources: "Sources",
       chars: "{count}/2000",
       errors: {
         OFFLINE: "You appear to be offline. Reconnect and try again.",
@@ -121,6 +123,7 @@
       stopped: "Generierung gestoppt.",
       resetDone: "Lokale Sitzung zurückgesetzt.",
       responseReady: "Neue Antwort ist vollständig.",
+      sources: "Quellen",
       chars: "{count}/2000",
       errors: {
         OFFLINE: "Du bist offenbar offline. Verbinde dich erneut und versuche es noch einmal.",
@@ -186,7 +189,7 @@
         name: "Professional",
         avatar: "PRO",
         description: "Projects, technology, work, and career",
-        greeting: "Hi, I’m Example Candidate’s professional persona.",
+        greeting: "Hi, I’m the owner’s professional persona.",
         intro: "Ask about my education, technical direction, projects, capabilities, or career plans.",
         questions: ["Which project represents you best?", "What are you learning now?", "What kind of role are you looking for?"],
       },
@@ -194,7 +197,7 @@
         name: "Casual",
         avatar: "HI",
         description: "Daily life, interests, and personality",
-        greeting: "Hi, I’m Example Candidate’s casual persona.",
+        greeting: "Hi, I’m the owner’s casual persona.",
         intro: "We can chat about football, coffee, music, games, and my approved public personality traits.",
         questions: ["What do you enjoy outside work?", "How would you describe your personality?", "Why do you like coffee?"],
       },
@@ -257,6 +260,29 @@
     return typeof value === "string" ? value.slice(0, limit) : "";
   }
 
+  function sourceCitation(value) {
+    if (!value || typeof value !== "object") return null;
+    const id = safeText(value.source_id, 16);
+    const url = safeText(value.url, 200);
+    if (!/^S[1-9][0-9]*$/.test(id) || !/^\/api\/v1\/knowledge\/sources\/[a-zA-Z0-9_-]+$/.test(url)) {
+      return null;
+    }
+    const locations = Array.isArray(value.locations)
+      ? value.locations.slice(0, 4).map((part) => {
+        if (!part || typeof part !== "object" || Array.isArray(part)) return {};
+        return Object.fromEntries(Object.entries(part).filter(([, item]) =>
+          typeof item === "string" || typeof item === "number"));
+      })
+      : [];
+    return {
+      source_id: id,
+      title: safeText(value.title, 160),
+      url,
+      locations,
+      snippet: safeText(value.snippet, 500),
+    };
+  }
+
   function randomId() {
     if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
     const bytes = new Uint8Array(16);
@@ -290,6 +316,9 @@
           role: item.role,
           content: safeText(item.content),
           status,
+          sources: item.role === "assistant" && Array.isArray(item.sources)
+            ? item.sources.map(sourceCitation).filter(Boolean).slice(0, 5)
+            : [],
         };
       })
       .filter((item) => item.content)
@@ -389,7 +418,7 @@
     return element;
   }
 
-  class AgentChatWidget extends HTMLElement {
+  class ZachChatWidget extends HTMLElement {
     static get observedAttributes() {
       return ["theme", "locale", "position", "title", "layout"];
     }
@@ -512,22 +541,22 @@
       this.shadowRoot.innerHTML = `
         <style>
           :host {
-            --agent-accent: #0a84ff;
-            --agent-accent-strong: #0071e3;
-            --agent-wechat: #95ec69;
-            --agent-wechat-strong: #79d64e;
-            --agent-bg: rgb(239 245 251 / .84);
-            --agent-surface: rgb(255 255 255 / .78);
-            --agent-surface-strong: #ffffff;
-            --agent-surface-muted: rgb(236 242 248 / .82);
-            --agent-glass: rgb(250 253 255 / .66);
-            --agent-glass-line: rgb(255 255 255 / .82);
-            --agent-ink: #17202c;
-            --agent-muted: #617083;
-            --agent-line: rgb(125 145 168 / .24);
-            --agent-danger: #b42318;
-            --agent-focus: #006fe6;
-            --agent-panel-shadow: 0 32px 80px rgb(34 57 87 / .24), 0 8px 24px rgb(34 57 87 / .14);
+            --zach-accent: #0a84ff;
+            --zach-accent-strong: #0071e3;
+            --zach-wechat: #95ec69;
+            --zach-wechat-strong: #79d64e;
+            --zach-bg: rgb(239 245 251 / .84);
+            --zach-surface: rgb(255 255 255 / .78);
+            --zach-surface-strong: #ffffff;
+            --zach-surface-muted: rgb(236 242 248 / .82);
+            --zach-glass: rgb(250 253 255 / .66);
+            --zach-glass-line: rgb(255 255 255 / .82);
+            --zach-ink: #17202c;
+            --zach-muted: #617083;
+            --zach-line: rgb(125 145 168 / .24);
+            --zach-danger: #b42318;
+            --zach-focus: #006fe6;
+            --zach-panel-shadow: 0 32px 80px rgb(34 57 87 / .24), 0 8px 24px rgb(34 57 87 / .14);
             position: fixed;
             right: 0;
             bottom: 0;
@@ -545,7 +574,7 @@
           button { cursor: pointer; }
           button:disabled { cursor: not-allowed; opacity: .55; }
           button:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible {
-            outline: 3px solid var(--agent-focus);
+            outline: 3px solid var(--zach-focus);
             outline-offset: 2px;
           }
           .widget {
@@ -554,26 +583,26 @@
             bottom: 20px;
             display: grid;
             justify-items: end;
-            color: var(--agent-ink);
+            color: var(--zach-ink);
           }
           .widget[data-position="bottom-left"] { right: auto; left: 20px; justify-items: start; }
           .widget[data-theme="dark"] {
-            --agent-accent: #64d2ff;
-            --agent-accent-strong: #36a9ff;
-            --agent-wechat: #5dba43;
-            --agent-wechat-strong: #4aa534;
-            --agent-bg: rgb(19 27 38 / .86);
-            --agent-surface: rgb(34 44 58 / .78);
-            --agent-surface-strong: #263244;
-            --agent-surface-muted: rgb(44 57 73 / .82);
-            --agent-glass: rgb(25 35 49 / .68);
-            --agent-glass-line: rgb(255 255 255 / .18);
-            --agent-ink: #f4f7fb;
-            --agent-muted: #b3bdc9;
-            --agent-line: rgb(208 225 242 / .16);
-            --agent-danger: #ff8a80;
-            --agent-focus: #64d2ff;
-            --agent-panel-shadow: 0 34px 90px rgb(0 0 0 / .5), 0 8px 24px rgb(0 0 0 / .32);
+            --zach-accent: #64d2ff;
+            --zach-accent-strong: #36a9ff;
+            --zach-wechat: #5dba43;
+            --zach-wechat-strong: #4aa534;
+            --zach-bg: rgb(19 27 38 / .86);
+            --zach-surface: rgb(34 44 58 / .78);
+            --zach-surface-strong: #263244;
+            --zach-surface-muted: rgb(44 57 73 / .82);
+            --zach-glass: rgb(25 35 49 / .68);
+            --zach-glass-line: rgb(255 255 255 / .18);
+            --zach-ink: #f4f7fb;
+            --zach-muted: #b3bdc9;
+            --zach-line: rgb(208 225 242 / .16);
+            --zach-danger: #ff8a80;
+            --zach-focus: #64d2ff;
+            --zach-panel-shadow: 0 34px 90px rgb(0 0 0 / .5), 0 8px 24px rgb(0 0 0 / .32);
             color-scheme: dark;
           }
           .panel {
@@ -585,12 +614,12 @@
             grid-template-rows: auto minmax(0, 1fr) auto auto;
             margin-bottom: 12px;
             overflow: hidden;
-            border: 1px solid var(--agent-glass-line);
+            border: 1px solid var(--zach-glass-line);
             border-radius: 30px;
             background:
               linear-gradient(145deg, rgb(255 255 255 / .42), transparent 35%),
-              var(--agent-glass);
-            box-shadow: var(--agent-panel-shadow), inset 0 1px 0 rgb(255 255 255 / .7);
+              var(--zach-glass);
+            box-shadow: var(--zach-panel-shadow), inset 0 1px 0 rgb(255 255 255 / .7);
             -webkit-backdrop-filter: blur(30px) saturate(180%);
             backdrop-filter: blur(30px) saturate(180%);
             transform-origin: bottom right;
@@ -625,7 +654,7 @@
             gap: 10px;
             min-height: 76px;
             padding: 13px 13px 12px 16px;
-            border-bottom: 1px solid var(--agent-line);
+            border-bottom: 1px solid var(--zach-line);
             background: linear-gradient(180deg, rgb(255 255 255 / .34), rgb(255 255 255 / .08));
             -webkit-backdrop-filter: blur(18px) saturate(150%);
             backdrop-filter: blur(18px) saturate(150%);
@@ -670,7 +699,7 @@
           .eyebrow {
             display: block;
             margin-bottom: 1px;
-            color: var(--agent-accent-strong);
+            color: var(--zach-accent-strong);
             font-size: 9px;
             font-weight: 800;
             letter-spacing: .1em;
@@ -683,22 +712,22 @@
             text-overflow: ellipsis;
             white-space: nowrap;
           }
-          .presence { display: flex; align-items: center; gap: 6px; color: var(--agent-muted); font-size: 11px; }
+          .presence { display: flex; align-items: center; gap: 6px; color: var(--zach-muted); font-size: 11px; }
           .presence-dot { width: 7px; height: 7px; border-radius: 50%; background: #32d74b; box-shadow: 0 0 0 3px rgb(50 215 75 / .13); }
-          .presence[data-offline="true"] .presence-dot { background: var(--agent-danger); }
+          .presence[data-offline="true"] .presence-dot { background: var(--zach-danger); }
           .controls { display: flex; align-items: center; gap: 3px; }
           .icon-button, .locale-select {
             min-width: 34px;
             height: 34px;
             border: 1px solid rgb(255 255 255 / .44);
             border-radius: 999px;
-            color: var(--agent-muted);
+            color: var(--zach-muted);
             background: rgb(255 255 255 / .24);
             box-shadow: inset 0 1px 0 rgb(255 255 255 / .32);
             -webkit-backdrop-filter: blur(14px) saturate(140%);
             backdrop-filter: blur(14px) saturate(140%);
           }
-          .icon-button:hover, .locale-select:hover { color: var(--agent-ink); background: rgb(255 255 255 / .52); transform: translateY(-1px); }
+          .icon-button:hover, .locale-select:hover { color: var(--zach-ink); background: rgb(255 255 255 / .52); transform: translateY(-1px); }
           .icon-button { display: grid; place-items: center; padding: 0; font-size: 18px; }
           .locale-select { width: 57px; padding: 0 7px; font-size: 10px; font-weight: 750; }
           .conversation {
@@ -711,7 +740,7 @@
             overflow: auto;
             padding: 20px 15px 24px;
             overscroll-behavior: contain;
-            scrollbar-color: var(--agent-line) transparent;
+            scrollbar-color: var(--zach-line) transparent;
             background:
               radial-gradient(circle at 100% 0%, rgb(100 210 255 / .11), transparent 34%),
               radial-gradient(circle at 0% 82%, rgb(149 236 105 / .1), transparent 32%);
@@ -721,9 +750,9 @@
             position: relative;
             overflow: hidden;
             padding: 20px;
-            border: 1px solid var(--agent-line);
+            border: 1px solid var(--zach-line);
             border-radius: 22px;
-            background: color-mix(in srgb, var(--agent-surface-strong) 76%, transparent);
+            background: color-mix(in srgb, var(--zach-surface-strong) 76%, transparent);
             box-shadow: 0 10px 28px rgb(38 61 89 / .08), inset 0 1px 0 rgb(255 255 255 / .58);
           }
           .intro-card::before {
@@ -731,14 +760,14 @@
             position: absolute;
             inset: 0 auto 0 0;
             width: 5px;
-            background: linear-gradient(180deg, var(--agent-accent), #7065ff, var(--agent-wechat-strong));
+            background: linear-gradient(180deg, var(--zach-accent), #7065ff, var(--zach-wechat-strong));
           }
           .intro-title { margin: 0 0 8px; font-size: 18px; line-height: 1.25; letter-spacing: -.02em; }
-          .profile-title { margin: -2px 0 8px; color: var(--agent-accent-strong); font-size: 11px; font-weight: 700; }
-          .intro-text { margin: 0; color: var(--agent-muted); font-size: 13px; }
+          .profile-title { margin: -2px 0 8px; color: var(--zach-accent-strong); font-size: 11px; font-weight: 700; }
+          .intro-text { margin: 0; color: var(--zach-muted); font-size: 13px; }
           .contact-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
           .contact-link {
-            color: var(--agent-accent-strong);
+            color: var(--zach-accent-strong);
             font-size: 12px;
             font-weight: 700;
             text-decoration: none;
@@ -746,7 +775,7 @@
           .contact-link:hover { text-decoration: underline; }
           .quick-title {
             margin: 0 0 9px;
-            color: var(--agent-muted);
+            color: var(--zach-muted);
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
             font-size: 10px;
             font-weight: 700;
@@ -757,10 +786,10 @@
           .quick-button {
             width: 100%;
             padding: 11px 13px;
-            border: 1px solid var(--agent-line);
+            border: 1px solid var(--zach-line);
             border-radius: 16px;
-            color: var(--agent-ink);
-            background: color-mix(in srgb, var(--agent-surface-strong) 64%, transparent);
+            color: var(--zach-ink);
+            background: color-mix(in srgb, var(--zach-surface-strong) 64%, transparent);
             box-shadow: inset 0 1px 0 rgb(255 255 255 / .46);
             -webkit-backdrop-filter: blur(12px) saturate(130%);
             backdrop-filter: blur(12px) saturate(130%);
@@ -768,24 +797,24 @@
             font-size: 13px;
             transition: border-color 180ms ease, transform 180ms cubic-bezier(.2, .8, .2, 1), background 180ms ease;
           }
-          .quick-button:hover { border-color: color-mix(in srgb, var(--agent-accent) 56%, white); background: var(--agent-surface); transform: translateY(-2px); }
+          .quick-button:hover { border-color: color-mix(in srgb, var(--zach-accent) 56%, white); background: var(--zach-surface); transform: translateY(-2px); }
           .disclaimer-full {
             margin: 0;
             padding-top: 14px;
-            border-top: 1px solid var(--agent-line);
-            color: var(--agent-muted);
+            border-top: 1px solid var(--zach-line);
+            color: var(--zach-muted);
             font-size: 10px;
             line-height: 1.55;
           }
           .persona-picker { min-height: 100%; display: grid; align-content: start; gap: 16px; }
           .persona-picker-heading { padding: 2px 4px 0; }
           .persona-picker-title { margin: 0 0 4px; font-size: 20px; letter-spacing: -.025em; }
-          .persona-picker-hint { margin: 0; color: var(--agent-muted); font-size: 12px; }
+          .persona-picker-hint { margin: 0; color: var(--zach-muted); font-size: 12px; }
           .persona-list {
             overflow: hidden;
-            border: 1px solid var(--agent-line);
+            border: 1px solid var(--zach-line);
             border-radius: 22px;
-            background: color-mix(in srgb, var(--agent-surface-strong) 72%, transparent);
+            background: color-mix(in srgb, var(--zach-surface-strong) 72%, transparent);
             box-shadow: 0 12px 30px rgb(38 61 89 / .09), inset 0 1px 0 rgb(255 255 255 / .58);
           }
           .persona-contact {
@@ -796,13 +825,13 @@
             gap: 12px;
             padding: 15px;
             border: 0;
-            color: var(--agent-ink);
+            color: var(--zach-ink);
             background: transparent;
             text-align: left;
             transition: background 160ms ease;
           }
-          .persona-contact + .persona-contact { border-top: 1px solid var(--agent-line); }
-          .persona-contact:hover { background: color-mix(in srgb, var(--agent-accent) 8%, transparent); }
+          .persona-contact + .persona-contact { border-top: 1px solid var(--zach-line); }
+          .persona-contact:hover { background: color-mix(in srgb, var(--zach-accent) 8%, transparent); }
           .persona-avatar {
             width: 48px;
             height: 48px;
@@ -819,9 +848,9 @@
           .persona-contact[data-persona="casual"] .persona-avatar { color: #173511; background: linear-gradient(145deg, #c7f9a7, #79d64e 52%, #44b87a); }
           .persona-contact-copy { min-width: 0; display: grid; gap: 3px; }
           .persona-contact-name { font-size: 15px; font-weight: 780; }
-          .persona-contact-description { overflow: hidden; color: var(--agent-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-          .persona-contact-arrow { color: var(--agent-muted); font-size: 20px; }
-          .persona-independent { margin: 0; padding: 0 5px; color: var(--agent-muted); font-size: 10px; line-height: 1.55; }
+          .persona-contact-description { overflow: hidden; color: var(--zach-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+          .persona-contact-arrow { color: var(--zach-muted); font-size: 20px; }
+          .persona-independent { margin: 0; padding: 0 5px; color: var(--zach-muted); font-size: 10px; line-height: 1.55; }
           .message-row {
             display: grid;
             grid-template-columns: 32px minmax(0, 1fr) 32px;
@@ -845,14 +874,14 @@
           }
           .user .message-avatar {
             grid-column: 3;
-            background: linear-gradient(145deg, #b8f593, var(--agent-wechat-strong));
+            background: linear-gradient(145deg, #b8f593, var(--zach-wechat-strong));
             color: #173511;
           }
           .assistant .message-avatar { grid-column: 1; }
           .message-stack { grid-row: 1; min-width: 0; max-width: min(100%, 310px); display: grid; gap: 4px; }
           .assistant .message-stack { grid-column: 2; justify-self: start; }
           .user .message-stack { grid-column: 2; justify-self: end; justify-items: end; }
-          .message-label { padding: 0 3px; color: var(--agent-muted); font-size: 9px; font-weight: 700; letter-spacing: .035em; }
+          .message-label { padding: 0 3px; color: var(--zach-muted); font-size: 9px; font-weight: 700; letter-spacing: .035em; }
           .bubble {
             position: relative;
             max-width: 100%;
@@ -873,42 +902,48 @@
           }
           .user .bubble {
             color: #15300e;
-            background: linear-gradient(145deg, #aff28a, var(--agent-wechat));
+            background: linear-gradient(145deg, #aff28a, var(--zach-wechat));
             border-top-right-radius: 8px;
           }
           .user .bubble::after {
             right: -7px;
-            background: var(--agent-wechat);
+            background: var(--zach-wechat);
             clip-path: polygon(0 0, 100% 38%, 0 100%);
           }
           .assistant .bubble {
-            border: 1px solid var(--agent-line);
-            color: var(--agent-ink);
-            background: color-mix(in srgb, var(--agent-surface-strong) 84%, transparent);
+            border: 1px solid var(--zach-line);
+            color: var(--zach-ink);
+            background: color-mix(in srgb, var(--zach-surface-strong) 84%, transparent);
             border-top-left-radius: 8px;
           }
-          .assistant .bubble::after { left: -7px; background: var(--agent-surface-strong); clip-path: polygon(100% 0, 0 38%, 100% 100%); opacity: .84; }
+          .assistant .bubble::after { left: -7px; background: var(--zach-surface-strong); clip-path: polygon(100% 0, 0 38%, 100% 100%); opacity: .84; }
           .assistant[data-status="pending"] .bubble:empty::after {
             content: "";
             display: block;
             width: 22px;
             height: 8px;
-            background: radial-gradient(circle, var(--agent-muted) 2px, transparent 2.5px) 0 50% / 8px 8px;
+            background: radial-gradient(circle, var(--zach-muted) 2px, transparent 2.5px) 0 50% / 8px 8px;
             animation: thinking 850ms linear infinite;
           }
           @keyframes thinking { to { background-position: 8px 50%; } }
           .assistant[data-status="stopped"] .bubble, .assistant[data-status="error"] .bubble {
             border-style: dashed;
           }
-          .message-status { padding: 0 3px; color: var(--agent-muted); font-size: 9px; }
+          .message-status { padding: 0 3px; color: var(--zach-muted); font-size: 9px; }
+          .message-sources { max-width: 100%; padding: 7px 10px; border: 1px solid var(--zach-line); border-radius: 11px; color: var(--zach-muted); background: var(--zach-surface); font-size: 11px; }
+          .message-sources summary { cursor: pointer; color: var(--zach-ink); }
+          .message-sources ol { margin: 7px 0 0; padding-left: 17px; }
+          .message-sources li + li { margin-top: 7px; }
+          .message-sources a { color: var(--zach-accent-strong); overflow-wrap: anywhere; }
+          .message-source-location, .message-source-snippet { display: block; margin-top: 2px; overflow-wrap: anywhere; }
           .error-banner {
             display: flex;
             align-items: center;
             gap: 10px;
             padding: 9px 12px;
-            border-top: 1px solid color-mix(in srgb, var(--agent-danger) 35%, var(--agent-line));
-            color: var(--agent-danger);
-            background: color-mix(in srgb, var(--agent-danger) 7%, var(--agent-surface));
+            border-top: 1px solid color-mix(in srgb, var(--zach-danger) 35%, var(--zach-line));
+            color: var(--zach-danger);
+            background: color-mix(in srgb, var(--zach-danger) 7%, var(--zach-surface));
             font-size: 12px;
           }
           .error-text { flex: 1; }
@@ -923,7 +958,7 @@
           }
           .composer {
             padding: 11px 12px 10px;
-            border-top: 1px solid var(--agent-line);
+            border-top: 1px solid var(--zach-line);
             background: linear-gradient(0deg, rgb(255 255 255 / .3), rgb(255 255 255 / .08));
             -webkit-backdrop-filter: blur(22px) saturate(160%);
             backdrop-filter: blur(22px) saturate(160%);
@@ -934,14 +969,14 @@
             align-items: end;
             gap: 8px;
             padding: 6px 6px 6px 14px;
-            border: 1px solid var(--agent-glass-line);
+            border: 1px solid var(--zach-glass-line);
             border-radius: 22px;
-            background: color-mix(in srgb, var(--agent-surface-strong) 58%, transparent);
+            background: color-mix(in srgb, var(--zach-surface-strong) 58%, transparent);
             box-shadow: 0 6px 18px rgb(31 52 75 / .1), inset 0 1px 0 rgb(255 255 255 / .6);
             -webkit-backdrop-filter: blur(16px) saturate(145%);
             backdrop-filter: blur(16px) saturate(145%);
           }
-          .input-wrap:focus-within { border-color: var(--agent-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--agent-accent) 14%, transparent); }
+          .input-wrap:focus-within { border-color: var(--zach-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--zach-accent) 14%, transparent); }
           textarea {
             width: 100%;
             min-height: 36px;
@@ -949,11 +984,11 @@
             resize: none;
             border: 0;
             outline: 0;
-            color: var(--agent-ink);
+            color: var(--zach-ink);
             background: transparent;
             line-height: 1.4;
           }
-          textarea::placeholder { color: var(--agent-muted); }
+          textarea::placeholder { color: var(--zach-muted); }
           .primary-button {
             min-width: 64px;
             min-height: 36px;
@@ -961,17 +996,17 @@
             border-radius: 17px;
             padding: 7px 12px;
             color: #163412;
-            background: linear-gradient(145deg, #b5f38f, var(--agent-wechat-strong));
+            background: linear-gradient(145deg, #b5f38f, var(--zach-wechat-strong));
             box-shadow: 0 6px 14px rgb(72 156 46 / .22), inset 0 1px 0 rgb(255 255 255 / .54);
             font-size: 12px;
             font-weight: 750;
           }
           .primary-button:hover:not(:disabled) { filter: brightness(1.04); transform: translateY(-1px); }
-          .stop-button { color: white; background: linear-gradient(145deg, #ff7b72, var(--agent-danger)); box-shadow: 0 6px 14px rgb(180 35 24 / .2); }
+          .stop-button { color: white; background: linear-gradient(145deg, #ff7b72, var(--zach-danger)); box-shadow: 0 6px 14px rgb(180 35 24 / .2); }
           .composer-meta { display: flex; align-items: center; gap: 8px; padding: 7px 2px 0; }
-          .disclaimer-short { flex: 1; color: var(--agent-muted); font-size: 9px; }
-          .char-count { color: var(--agent-muted); font-size: 9px; font-variant-numeric: tabular-nums; }
-          .reset-button { border: 0; padding: 2px; color: var(--agent-muted); background: transparent; font-size: 9px; text-decoration: underline; }
+          .disclaimer-short { flex: 1; color: var(--zach-muted); font-size: 9px; }
+          .char-count { color: var(--zach-muted); font-size: 9px; font-variant-numeric: tabular-nums; }
+          .reset-button { border: 0; padding: 2px; color: var(--zach-muted); background: transparent; font-size: 9px; text-decoration: underline; }
           .launcher {
             position: relative;
             overflow: hidden;
@@ -982,9 +1017,9 @@
             min-width: 238px;
             min-height: 58px;
             padding: 9px 13px 9px 9px;
-            border: 1px solid var(--agent-glass-line);
+            border: 1px solid var(--zach-glass-line);
             border-radius: 24px;
-            color: var(--agent-ink);
+            color: var(--zach-ink);
             background: linear-gradient(145deg, rgb(255 255 255 / .7), rgb(242 249 255 / .4));
             box-shadow: 0 18px 42px rgb(30 57 89 / .2), inset 0 1px 0 rgb(255 255 255 / .84);
             -webkit-backdrop-filter: blur(24px) saturate(180%);
@@ -1019,8 +1054,8 @@
           }
           .launcher-copy { display: grid; gap: 1px; }
           .launcher-title { font-size: 13px; font-weight: 760; }
-          .launcher-hint { color: var(--agent-muted); font-size: 10px; }
-          .launcher-arrow { color: var(--agent-accent-strong); font-size: 18px; }
+          .launcher-hint { color: var(--zach-muted); font-size: 10px; }
+          .launcher-arrow { color: var(--zach-accent-strong); font-size: 18px; }
           .mini {
             width: min(310px, calc(100vw - 32px));
             display: flex;
@@ -1028,14 +1063,14 @@
             gap: 6px;
             margin-bottom: 12px;
             padding: 7px;
-            border: 1px solid var(--agent-glass-line);
+            border: 1px solid var(--zach-glass-line);
             border-radius: 22px;
-            background: var(--agent-glass);
+            background: var(--zach-glass);
             box-shadow: 0 18px 42px rgb(30 57 89 / .2), inset 0 1px 0 rgb(255 255 255 / .68);
             -webkit-backdrop-filter: blur(24px) saturate(175%);
             backdrop-filter: blur(24px) saturate(175%);
           }
-          .mini-restore { flex: 1; border: 0; padding: 7px 9px; color: var(--agent-ink); background: transparent; text-align: left; font-size: 12px; font-weight: 700; }
+          .mini-restore { flex: 1; border: 0; padding: 7px 9px; color: var(--zach-ink); background: transparent; text-align: left; font-size: 12px; font-weight: 700; }
           .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
           :host([layout="stage"]) {
             position: relative;
@@ -1086,12 +1121,12 @@
             :host([layout="stage"]) .panel { width: 100%; height: 100%; margin: 0; }
           }
           @media (prefers-contrast: more) {
-            :host { --agent-line: rgb(50 63 78 / .62); --agent-glass-line: rgb(50 63 78 / .7); }
-            .widget[data-theme="dark"] { --agent-line: rgb(240 246 255 / .58); --agent-glass-line: rgb(240 246 255 / .64); }
-            .panel, .launcher, .mini { background: var(--agent-surface-strong); }
+            :host { --zach-line: rgb(50 63 78 / .62); --zach-glass-line: rgb(50 63 78 / .7); }
+            .widget[data-theme="dark"] { --zach-line: rgb(240 246 255 / .58); --zach-glass-line: rgb(240 246 255 / .64); }
+            .panel, .launcher, .mini { background: var(--zach-surface-strong); }
           }
           @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-            .panel, .launcher, .mini, .header, .composer, .input-wrap, .quick-button { background: var(--agent-surface-strong); }
+            .panel, .launcher, .mini, .header, .composer, .input-wrap, .quick-button { background: var(--zach-surface-strong); }
           }
           @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
@@ -1102,7 +1137,7 @@
             <header class="header">
               <div class="header-leading">
                 <button class="icon-button back-button" type="button" hidden>‹</button>
-                <div class="avatar" aria-hidden="true">AI</div>
+                <div class="avatar" aria-hidden="true">ZZ</div>
               </div>
               <div class="identity">
                 <span class="eyebrow"></span>
@@ -1110,8 +1145,8 @@
                 <span class="presence"><span class="presence-dot"></span><span class="presence-text"></span></span>
               </div>
               <div class="controls">
-                <label class="sr-only" for="agent-locale"></label>
-                <select class="locale-select" id="agent-locale">
+                <label class="sr-only" for="zach-locale"></label>
+                <select class="locale-select" id="zach-locale">
                   <option value="auto">AUTO</option>
                   <option value="zh">中文</option>
                   <option value="en">EN</option>
@@ -1130,9 +1165,9 @@
               <button class="retry-button" type="button"></button>
             </div>
             <form class="composer">
-              <label class="sr-only" for="agent-message">Message</label>
+              <label class="sr-only" for="zach-message">Message</label>
               <div class="input-wrap">
-                <textarea id="agent-message" rows="1" maxlength="2000"></textarea>
+                <textarea id="zach-message" rows="1" maxlength="2000"></textarea>
                 <button class="primary-button send-button" type="submit"></button>
                 <button class="primary-button stop-button" type="button" hidden></button>
               </div>
@@ -1173,7 +1208,7 @@
         presence: select(".presence"),
         presenceText: select(".presence-text"),
         localeSelect: select(".locale-select"),
-        localeLabel: select('label[for="agent-locale"]'),
+        localeLabel: select('label[for="zach-locale"]'),
         themeButton: select(".theme-button"),
         minimizeButton: select(".minimize-button"),
         closeButton: select(".close-button"),
@@ -1284,11 +1319,12 @@
         const state = {
           version: STATE_VERSION,
           sessionId: this.sessionId,
-          messages: this.messages.slice(-MAX_MESSAGES).map(({ id, role, content, status }) => ({
+          messages: this.messages.slice(-MAX_MESSAGES).map(({ id, role, content, status, sources }) => ({
             id,
             role,
             content,
             status: ["pending", "streaming"].includes(status) ? "stopped" : status,
+            ...(role === "assistant" && sources?.length ? { sources } : {}),
           })),
           locale: this.localePreference,
           theme: this.themePreference,
@@ -1341,11 +1377,12 @@
         if (this.activePersona) {
           this.personaConversations[this.activePersona] = {
             sessionId: this.sessionId,
-            messages: this.messages.slice(-MAX_MESSAGES).map(({ id, role, content, status }) => ({
+            messages: this.messages.slice(-MAX_MESSAGES).map(({ id, role, content, status, sources }) => ({
               id,
               role,
               content,
               status: ["pending", "streaming"].includes(status) ? "stopped" : status,
+              ...(role === "assistant" && sources?.length ? { sources } : {}),
             })),
           };
         }
@@ -1510,7 +1547,7 @@
       this.elements.widget.dataset.position =
         this.getAttribute("position") === "bottom-left" ? "bottom-left" : "bottom-right";
       this.updateThemeButton();
-      this.dispatchEvent(new CustomEvent("agent-theme-change", {
+      this.dispatchEvent(new CustomEvent("zach-theme-change", {
         bubbles: true,
         composed: true,
         detail: {
@@ -1699,12 +1736,32 @@
               ? (this.locale === "de" ? "DU" : this.locale === "zh" ? "你" : "YOU")
               : this.personaMode
                 ? `${this.personaDefinition().name} · AI`
-                : "ZACHARY · AI",
+                : "AGENT · AI",
           );
           const bubble = createElement(documentRef, "div", "bubble", message.content);
           const status = createElement(documentRef, "span", "message-status");
           if (message.status === "stopped") status.textContent = this.copy.stopped;
           stack.append(label, bubble);
+          if (message.role === "assistant" && message.status === "complete" && message.sources?.length) {
+            const sources = createElement(documentRef, "details", "message-sources");
+            sources.append(createElement(documentRef, "summary", "", this.copy.sources));
+            const list = createElement(documentRef, "ol");
+            for (const source of message.sources) {
+              const item = createElement(documentRef, "li");
+              const link = createElement(documentRef, "a", "", `[${source.source_id}] ${source.title}`);
+              link.href = this.apiUrl(source.url);
+              link.target = "_blank";
+              link.rel = "noopener noreferrer";
+              item.append(link);
+              const location = source.locations.map((part) =>
+                Object.entries(part).map(([key, value]) => `${key}: ${value}`).join(" · ")).filter(Boolean).join(" / ");
+              if (location) item.append(createElement(documentRef, "span", "message-source-location", location));
+              if (source.snippet) item.append(createElement(documentRef, "span", "message-source-snippet", source.snippet));
+              list.append(item);
+            }
+            sources.append(list);
+            stack.append(sources);
+          }
           if (status.textContent) stack.append(status);
           row.append(stack, avatar);
           fragment.append(row);
@@ -1833,6 +1890,7 @@
         role: "assistant",
         content: "",
         status: "pending",
+        sources: [],
       };
       this.messages.push(assistantMessage);
       this.messages = this.messages.slice(-MAX_MESSAGES);
@@ -1870,6 +1928,7 @@
           throw new WidgetError("STREAM_INVALID");
         }
         let sawDone = false;
+        let availableSources = [];
         for await (const event of parseSSEStream(response.body)) {
           let data;
           try {
@@ -1880,6 +1939,10 @@
           if (event.event === "meta") {
             this.requestState = "streaming";
             assistantMessage.status = "streaming";
+          } else if (event.event === "sources") {
+            availableSources = Array.isArray(data.sources)
+              ? data.sources.map(sourceCitation).filter(Boolean).slice(0, 5)
+              : [];
           } else if (event.event === "delta") {
             if (typeof data.text !== "string") throw new WidgetError("STREAM_INVALID");
             this.requestState = "streaming";
@@ -1895,6 +1958,8 @@
             );
           } else if (event.event === "done") {
             sawDone = true;
+            const citedIds = new Set(Array.isArray(data.source_ids) ? data.source_ids : []);
+            assistantMessage.sources = availableSources.filter((source) => citedIds.has(source.source_id));
           }
         }
         if (!sawDone || !assistantMessage.content) throw new WidgetError("STREAM_INVALID");
@@ -2049,6 +2114,6 @@
   }
 
   if (!globalThis.customElements.get(TAG_NAME)) {
-    globalThis.customElements.define(TAG_NAME, AgentChatWidget);
+    globalThis.customElements.define(TAG_NAME, ZachChatWidget);
   }
 })();

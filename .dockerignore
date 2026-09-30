@@ -2,6 +2,7 @@
 !.dockerignore
 !backend/
 !backend/Dockerfile
+!backend/Dockerfile.rag
 !backend/pyproject.toml
 !backend/uv.lock
 !backend/app/

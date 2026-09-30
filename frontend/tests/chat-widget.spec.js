@@ -11,16 +11,6 @@ async function openWidget(page) {
   await expect(page.getByRole("dialog")).toBeVisible();
 }
 
-async function finishHomepageAnimations(page) {
-  await page.evaluate(async () => {
-    const host = document.querySelector("#main-chat");
-    const panel = host?.shadowRoot?.querySelector(".panel");
-    const animations = [...document.getAnimations(), ...(panel?.getAnimations() || [])]
-      .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity);
-    await Promise.all(animations.map((animation) => animation.finished.catch(() => undefined)));
-  });
-}
-
 test.beforeEach(async ({ page }) => {
   await resetServer(page);
   await page.goto(fixture);
@@ -62,14 +52,42 @@ test("SSE parser handles UTF-8 splits, CRLF, cross-chunk records, comments, and 
   ]);
 });
 
+test("legacy widget shows only cited sources and restores them safely", async ({ page }) => {
+  await page.route("**/api/v1/chat/stream", (route) => route.fulfill({
+    status: 200,
+    contentType: "text/event-stream",
+    body: [
+      'event: meta\ndata: {"persona_version":"example-0.1.0"}\n\n',
+      'event: sources\ndata: {"sources":[{"source_id":"S1","title":"Atlas <img src=x>","url":"/api/v1/knowledge/sources/chunk-1","locations":[{"page":2}],"snippet":"Bench result"},{"source_id":"S2","title":"Unused","url":"/api/v1/knowledge/sources/chunk-2","locations":[],"snippet":"Unused"},{"source_id":"S3","title":"Unsafe","url":"javascript:alert(1)","locations":[],"snippet":"Unsafe"}],"knowledge_status":"ok"}\n\n',
+      'event: delta\ndata: {"text":"Atlas answer [S1]"}\n\n',
+      'event: done\ndata: {"finish_reason":"stop","source_ids":["S1","S3"]}\n\n',
+    ].join(""),
+  }));
+  await openWidget(page);
+  await page.getByRole("textbox", { name: "Ask me anything…" }).fill("Atlas?");
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect(page.getByText("Atlas answer [S1]")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Ask me anything…" })).toBeEnabled();
+  await page.getByText("Sources", { exact: true }).click();
+  const source = page.getByRole("link", { name: "[S1] Atlas <img src=x>" });
+  await expect(source).toHaveAttribute("href", "http://127.0.0.1:4173/api/v1/knowledge/sources/chunk-1");
+  await expect(page.getByText("Unused", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Unsafe", { exact: true })).toHaveCount(0);
+  expect(await page.locator("agent-chat-widget").evaluate((host) =>
+    host.shadowRoot.querySelectorAll(".message-sources img").length)).toBe(0);
+  await page.reload();
+  await openWidget(page);
+  await expect(page.getByText("Sources", { exact: true })).toBeVisible();
+});
+
 test("profile, streaming, duplicate guard, session restore, minimize, close, and reset work", async ({ page }) => {
   await openWidget(page);
   await expect(page.getByText("Example Candidate", { exact: true })).toBeVisible();
-  await expect(page.getByText("Fictional software engineering student")).toBeVisible();
-  await expect(page.getByText("I am a completely fictional example candidate.", { exact: false })).toBeVisible();
+  await expect(page.getByText("M.Sc. student · Autonomous Systems and AI")).toBeVisible();
+  await expect(page.getByText("I am a Example Institute master’s student", { exact: false })).toBeVisible();
 
   await page.getByRole("button", { name: "Could you introduce yourself?" }).click();
-  await expect(page.getByText("我是完全虚构的示例候选人。")).toBeVisible();
+  await expect(page.getByText("我在做具身智能与全栈 AI。")).toBeVisible();
   const firstRequests = await (await page.request.get("/__test/requests")).json();
   expect(firstRequests).toHaveLength(1);
   expect(firstRequests[0].history).toEqual([]);
@@ -78,14 +96,14 @@ test("profile, streaming, duplicate guard, session restore, minimize, close, and
   await page.reload();
   await openWidget(page);
   await expect(page.getByText("Could you introduce yourself?", { exact: true })).toBeVisible();
-  await expect(page.getByText("我是完全虚构的示例候选人。")).toBeVisible();
+  await expect(page.getByText("我在做具身智能与全栈 AI。")).toBeVisible();
 
   await page.getByRole("button", { name: "Minimize chat" }).click();
   await expect(page.getByRole("button", { name: "Restore chat" })).toBeVisible();
   await page.getByRole("button", { name: "Restore chat" }).click();
   await page.getByRole("button", { name: "Reset local session" }).click();
   await expect(page.getByText("Try one of these")).toBeVisible();
-  await expect(page.getByText("我是完全虚构的示例候选人。")).toHaveCount(0);
+  await expect(page.getByText("我在做具身智能与全栈 AI。")).toHaveCount(0);
   await page.getByRole("button", { name: "Close chat" }).click();
   await expect(page.getByRole("button", { name: "Chat with my AI twin" })).toBeFocused();
 });
@@ -129,7 +147,7 @@ test("offline send stays local and can retry after reconnection", async ({ page,
   await context.setOffline(false);
   await expect(page.getByText("Ready", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Retry" }).click();
-  await expect(page.getByText("我是完全虚构的示例候选人。")).toBeVisible();
+  await expect(page.getByText("我在做具身智能与全栈 AI。")).toBeVisible();
   expect(await (await page.request.get("/__test/requests")).json()).toHaveLength(1);
 });
 
@@ -153,7 +171,7 @@ test("user and model HTML are always rendered as inert text", async ({ page }) =
 test("Liquid Glass shell and WeChat-style bubble anatomy are present", async ({ page }) => {
   await openWidget(page);
   await page.getByRole("button", { name: "Could you introduce yourself?" }).click();
-  await expect(page.getByText("我是完全虚构的示例候选人。")).toBeVisible();
+  await expect(page.getByText("我在做具身智能与全栈 AI。")).toBeVisible();
 
   const appearance = await page.evaluate(() => {
     const root = document.querySelector("agent-chat-widget").shadowRoot;
@@ -189,93 +207,85 @@ test("Liquid Glass shell and WeChat-style bubble anatomy are present", async ({ 
   expect(appearance.assistantTail).not.toBe("none");
 });
 
-test("chat-first homepage keeps professional and casual persona chats separate", async ({ page }) => {
-  const personaRequests = [];
-  await page.route("http://localhost:8000/api/v1/profile", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        persona_version: "example-0.1.0",
-        display_name: "Example Candidate",
-        title: "Fictional software engineering student",
-        intro: { zh: "公开 Persona 简介。", en: "Public Persona profile." },
-        quick_questions: {},
-        contact: { website: "https://example.com" },
-        disclaimer: "AI-generated",
-      }),
-    }),
-  );
-  await page.route("http://localhost:8000/api/v1/chat/stream", (route) => {
-    const payload = route.request().postDataJSON();
-    personaRequests.push(payload);
-    const reply = payload.persona_mode === "casual" ? "这是闲聊人格回复。" : "这是专业人格回复。";
-    return route.fulfill({
-      status: 200,
-      headers: { "Content-Type": "text/event-stream; charset=utf-8" },
-      body: [
-        'event: meta\ndata: {"request_id":"stage_1"}\n\n',
-        `event: delta\ndata: ${JSON.stringify({ text: reply })}\n\n`,
-        'event: done\ndata: {"finish_reason":"stop"}\n\n',
-      ].join(""),
-    });
+// The site embeds the widget on /work/self-agent with these attributes (TwinChat.astro);
+// only api-base points at the test server. It replaces the fixture's floating widget and drops the
+// session that widget just saved, otherwise the stage widget migrates it and runs in en/light.
+async function mountTwinStage(page, { width = "min(720px, 100%)" } = {}) {
+  await page.evaluate((stageWidth) => {
+    document.body.replaceChildren();
+    sessionStorage.removeItem("agent-chat-widget:session");
+    document.body.innerHTML = `
+      <main style="box-sizing:border-box;width:${stageWidth};margin:0 auto;padding:24px 16px">
+        <agent-chat-widget id="main-chat" api-base="http://127.0.0.1:4173" theme="dark" locale="zh"
+          layout="stage" start-open persona-mode></agent-chat-widget>
+      </main>`;
+  }, width);
+  await expect(page.locator("#main-chat .panel")).toBeVisible();
+}
+
+async function finishStageAnimations(page) {
+  await page.evaluate(async () => {
+    const panel = document.querySelector("#main-chat")?.shadowRoot?.querySelector(".panel");
+    const animations = [...document.getAnimations(), ...(panel?.getAnimations() || [])]
+      .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity);
+    await Promise.all(animations.map((animation) => animation.finished.catch(() => undefined)));
   });
+}
+
+test("self-agent stage widget keeps professional and casual persona chats separate", async ({ page }) => {
+  const professionalReply = "我在做具身智能与全栈 AI。";
+  const casualReply = "我平时喜欢足球、咖啡、音乐和 EA Sports FC。";
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/index.html");
-  await expect(page.getByRole("heading", { name: "你好 / Hello / Hallo" })).toBeVisible();
-  await expect(page.locator(".greeting-word")).toHaveText("你好");
-  await expect(page.locator(".prompt")).toHaveCount(0);
-  await finishHomepageAnimations(page);
+  await mountTwinStage(page);
+  await finishStageAnimations(page);
 
   const layout = await page.evaluate(() => {
     const host = document.querySelector("#main-chat");
     const panel = host.shadowRoot.querySelector(".panel");
-    const intro = document.querySelector(".intro").getBoundingClientRect();
-    const stage = document.querySelector(".chat-stage").getBoundingClientRect();
-    const panelRect = panel.getBoundingClientRect();
     return {
       dataLayout: host.shadowRoot.querySelector(".widget").dataset.layout,
+      dataTheme: host.shadowRoot.querySelector(".widget").dataset.theme,
       panelRole: panel.getAttribute("role"),
       panelModal: panel.getAttribute("aria-modal"),
       panelVisible: !panel.hidden,
-      panelWidth: panelRect.width,
-      separateColumns: intro.right < stage.left,
+      panelWidth: panel.getBoundingClientRect().width,
       pageWidth: document.documentElement.scrollWidth,
       viewportWidth: innerWidth,
     };
   });
   expect(layout).toMatchObject({
     dataLayout: "stage",
+    dataTheme: "dark",
     panelRole: "region",
     panelModal: null,
     panelVisible: true,
-    separateColumns: true,
   });
   expect(layout.panelWidth).toBeGreaterThanOrEqual(520);
   expect(layout.pageWidth).toBeLessThanOrEqual(layout.viewportWidth);
 
-  const widget = page.locator("agent-chat-widget");
+  const widget = page.locator("#main-chat");
   await expect(widget.locator(".persona-contact")).toHaveCount(2);
+  await expect(
+    widget.locator('.persona-contact[data-persona="professional"] .persona-contact-name'),
+  ).toHaveText("专业人格");
 
   await widget.locator('.persona-contact[data-persona="professional"]').click();
   const input = widget.locator("textarea");
   await input.fill("专业问题");
   await input.press("Enter");
-  await expect(page.getByText("这是专业人格回复。", { exact: true })).toBeVisible();
+  await expect(page.getByText(professionalReply, { exact: true })).toBeVisible();
   await widget.locator(".back-button").click();
 
   await widget.locator('.persona-contact[data-persona="casual"]').click();
   await input.fill("闲聊问题");
   await input.press("Enter");
-  await expect(page.getByText("这是闲聊人格回复。", { exact: true })).toBeVisible();
+  await expect(page.getByText(casualReply, { exact: true })).toBeVisible();
 
-  expect(personaRequests.map((request) => request.persona_mode)).toEqual([
-    "professional",
-    "casual",
-  ]);
-  expect(personaRequests[0].history).toEqual([]);
-  expect(personaRequests[1].history).toEqual([]);
+  const requests = await (await page.request.get("/__test/requests")).json();
+  expect(requests.map((request) => request.persona_mode)).toEqual(["professional", "casual"]);
+  expect(requests[0].history).toEqual([]);
+  expect(requests[1].history).toEqual([]);
 
   const stored = await page.evaluate(() =>
     JSON.parse(sessionStorage.getItem("agent-chat-widget:personas")),
@@ -290,10 +300,11 @@ test("chat-first homepage keeps professional and casual persona chats separate",
   await widget.locator(".back-button").click();
   await widget.locator('.persona-contact[data-persona="professional"]').click();
   await expect(page.getByText("专业问题", { exact: true })).toBeVisible();
-  await expect(page.getByText("这是专业人格回复。", { exact: true })).toBeVisible();
+  await expect(page.getByText(professionalReply, { exact: true })).toBeVisible();
   await expect(page.getByText("闲聊问题", { exact: true })).toHaveCount(0);
 
   await page.reload();
+  await mountTwinStage(page);
   await expect(page.getByText("专业问题", { exact: true })).toBeVisible();
   await widget.locator(".reset-button").click();
   await expect(page.getByText("专业问题", { exact: true })).toHaveCount(0);
@@ -302,113 +313,23 @@ test("chat-first homepage keeps professional and casual persona chats separate",
   await expect(page.getByText("闲聊问题", { exact: true })).toBeVisible();
 });
 
-test("homepage rotates Chinese, English, and German greetings without overlap", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/index.html");
-  const greeting = page.locator(".greeting-word");
-  await expect(greeting).toHaveCount(1);
-  await expect(greeting).toHaveText("你好");
-  await expect(greeting).toHaveText("Hello", { timeout: 4500 });
-  await expect(greeting).toHaveText("Hallo", { timeout: 4500 });
-
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.reload();
-  await expect(greeting).toHaveText("你好");
-  await page.waitForTimeout(3200);
-  await expect(greeting).toHaveText("你好");
-});
-
-test("homepage and chat stay synchronized across manual and system theme changes", async ({ page }) => {
-  await page.evaluate(() => sessionStorage.clear());
-  await page.emulateMedia({ colorScheme: "dark" });
-  await page.goto("/index.html");
-
-  const widget = page.locator("#main-chat");
-  const themeButton = widget.locator(".theme-button");
-  const themeState = () => page.evaluate(() => {
-    const host = document.querySelector("#main-chat");
-    return {
-      pageTheme: document.documentElement.dataset.theme,
-      pagePreference: document.documentElement.dataset.themePreference,
-      hostTheme: host.dataset.resolvedTheme,
-      hostPreference: host.dataset.themePreference,
-      chatTheme: host.shadowRoot.querySelector(".widget").dataset.theme,
-      pageBackground: getComputedStyle(document.documentElement).backgroundColor,
-    };
-  });
-
-  await expect.poll(themeState).toMatchObject({
-    pageTheme: "dark",
-    pagePreference: "auto",
-    hostTheme: "dark",
-    hostPreference: "auto",
-    chatTheme: "dark",
-    pageBackground: "rgb(0, 0, 0)",
-  });
-
-  await themeButton.click();
-  await expect.poll(themeState).toMatchObject({
-    pageTheme: "light",
-    pagePreference: "light",
-    hostTheme: "light",
-    hostPreference: "light",
-    chatTheme: "light",
-    pageBackground: "rgb(245, 245, 247)",
-  });
-
-  await themeButton.click();
-  await expect.poll(themeState).toMatchObject({
-    pageTheme: "dark",
-    pagePreference: "dark",
-    hostTheme: "dark",
-    hostPreference: "dark",
-    chatTheme: "dark",
-    pageBackground: "rgb(0, 0, 0)",
-  });
-
-  await themeButton.click();
-  await expect.poll(themeState).toMatchObject({
-    pageTheme: "dark",
-    pagePreference: "auto",
-    hostTheme: "dark",
-    hostPreference: "auto",
-    chatTheme: "dark",
-  });
-
-  await page.emulateMedia({ colorScheme: "light" });
-  await expect.poll(themeState).toMatchObject({
-    pageTheme: "light",
-    pagePreference: "auto",
-    hostTheme: "light",
-    hostPreference: "auto",
-    chatTheme: "light",
-    pageBackground: "rgb(245, 245, 247)",
-  });
-});
-
-test("chat-first homepage puts the chat before the introduction on mobile", async ({ page }) => {
+test("self-agent stage widget stays inside a phone viewport", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 640 });
-  await page.goto("/index.html");
-  await finishHomepageAnimations(page);
+  await mountTwinStage(page, { width: "100%" });
+  await finishStageAnimations(page);
   const mobile = await page.evaluate(() => {
     const host = document.querySelector("#main-chat");
     const panel = host.shadowRoot.querySelector(".panel").getBoundingClientRect();
-    const intro = document.querySelector(".intro").getBoundingClientRect();
-    const stage = document.querySelector(".chat-stage").getBoundingClientRect();
     return {
-      chatBeforeIntro: stage.top < intro.top,
       panelLeft: panel.left,
       panelRight: panel.right,
-      panelHeight: panel.height,
       personaContacts: host.shadowRoot.querySelectorAll(".persona-contact").length,
       viewportWidth: innerWidth,
       pageWidth: document.documentElement.scrollWidth,
     };
   });
-  expect(mobile.chatBeforeIntro).toBe(true);
   expect(mobile.panelLeft).toBeGreaterThanOrEqual(0);
   expect(mobile.panelRight).toBeLessThanOrEqual(mobile.viewportWidth);
-  expect(mobile.panelHeight).toBeGreaterThanOrEqual(540);
   expect(mobile.personaContacts).toBe(2);
   expect(mobile.pageWidth).toBeLessThanOrEqual(mobile.viewportWidth);
 });

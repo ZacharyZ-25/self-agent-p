@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
 class PersonaManifest(BaseModel):
-    schema_version: int = 1
+    schema_version: Literal[1, 2] = 1
     persona_version: str = Field(min_length=1)
     status: str = "draft"
     approved: bool = False
@@ -15,6 +16,7 @@ class PersonaManifest(BaseModel):
     last_verified_at: date | None = None
     style_mode: str = "first_person"
     required_files: list[str] = Field(min_length=1)
+    facts_policy: Literal["persona", "knowledge_base"] = "persona"
 
 
 class PersonaValidationReport(BaseModel):

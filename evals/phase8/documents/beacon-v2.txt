@@ -1,0 +1,8 @@
+Beacon Fortschritt
+FICTIONAL TEST DATA - not a real person, project, paper, or result.
+
+Aktueller Stand
+Am 2026-09-18 ist Beacon in der Laborvalidierung. Der Sensor ist BX-4. Es wurden 24 Versuche mit 21 Erfolgen abgeschlossen.
+
+Nächster Schritt
+Der nächste Beacon Versuch ist für 2026-10-12 geplant. Die Reichweite beträgt 8 m.

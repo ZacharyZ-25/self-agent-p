@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>知识库管理 · Local RAG</title>
+  <style>
+    :root { color-scheme: light; font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f3f2ed; color: #15261f; }
+    header { background: #123e34; color: white; padding: 22px max(24px, calc((100vw - 1160px)/2)); display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+    h1 { margin: 0; font-size: 22px; letter-spacing: .01em; }
+    header p { margin: 5px 0 0; opacity: .75; font-size: 13px; }
+    main { max-width: 1160px; margin: 28px auto; padding: 0 20px 50px; }
+    .grid { display: grid; grid-template-columns: minmax(330px, 440px) minmax(0, 1fr); gap: 20px; align-items: start; }
+    .card { background: #fff; border: 1px solid #d8ded6; border-radius: 14px; padding: 22px; box-shadow: 0 8px 30px #173a2910; }
+    h2 { margin: 0 0 16px; font-size: 18px; }
+    h3 { margin: 0; font-size: 16px; }
+    label { display: block; margin: 12px 0 5px; font-size: 13px; font-weight: 650; }
+    input, textarea, select, button { font: inherit; }
+    input, textarea, select { width: 100%; border: 1px solid #bac6ba; border-radius: 8px; padding: 9px 11px; background: white; color: inherit; }
+    textarea { min-height: 140px; resize: vertical; line-height: 1.5; }
+    input:focus, textarea:focus, select:focus { outline: 2px solid #247d61; outline-offset: 1px; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; }
+    button { cursor: pointer; border: 1px solid #9bb1a4; border-radius: 8px; padding: 8px 13px; background: #f8faf7; color: #183d30; }
+    button:hover { background: #eaf3ec; }
+    button:disabled { opacity: .55; cursor: wait; }
+    button.primary { background: #176449; color: #fff; border-color: #176449; }
+    button.primary:hover { background: #10533c; }
+    button.danger { color: #942e2e; border-color: #e2b8b8; }
+    .drop { border: 2px dashed #9caf9f; border-radius: 10px; padding: 17px; background: #f8faf7; margin-top: 12px; text-align: center; }
+    .drop.drag { border-color: #176449; background: #e8f2e9; }
+    .drop input { border: 0; padding: 4px; }
+    details.metadata { margin-top: 16px; border-top: 1px solid #e0e6de; padding-top: 13px; }
+    details.metadata summary { cursor: pointer; color: #176449; font-size: 14px; font-weight: 650; }
+    .hint, .meta { color: #5b6f62; font-size: 13px; line-height: 1.5; }
+    .status { min-height: 22px; margin: 12px 0; color: #1b684a; }
+    .status.error { color: #9f3030; }
+    .document { border-top: 1px solid #e0e6de; padding: 16px 0; }
+    .document:first-child { border-top: 0; padding-top: 0; }
+    .badge { display: inline-block; border-radius: 20px; padding: 3px 9px; background: #e9f2eb; color: #205c42; font-size: 12px; margin-left: 8px; }
+    .badge.private { background: #f2efe5; color: #76602e; }
+    .document .actions { margin-top: 10px; }
+    .document .actions button { font-size: 13px; padding: 6px 9px; }
+    .answer { white-space: pre-wrap; line-height: 1.6; }
+    .source { border-left: 3px solid #70a888; padding: 8px 12px; margin: 10px 0; background: #f6f9f6; }
+    .source p { margin: 5px 0; white-space: pre-wrap; }
+    .conversation { display: grid; gap: 12px; max-height: 460px; overflow-y: auto; padding: 4px 2px; }
+    .turn { max-width: 92%; border-radius: 12px; padding: 10px 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .turn.user { justify-self: end; background: #e5f1e9; }
+    .turn.agent { justify-self: start; background: #f3f5f1; }
+    .turn .sources { margin-top: 10px; border-top: 1px solid #d5dfd5; padding-top: 7px; white-space: normal; }
+    .turn .sources details { margin-top: 6px; font-size: 13px; }
+    .turn .sources summary { cursor: pointer; color: #176449; }
+    .turn .sources p { margin: 5px 0; white-space: pre-wrap; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f7f8f5; padding: 12px; border-radius: 8px; max-height: 300px; overflow: auto; }
+    [hidden] { display: none !important; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } header { padding: 20px; } }
+  </style>
+</head>
+<body>
+  <header><div><h1>知识库管理</h1><p>资料处理完成后自动切换到当前版本</p></div><button id="logout" hidden>退出登录</button></header>
+  <main>
+    <section id="login-panel" class="card" style="max-width:420px;margin:50px auto">
+      <h2>管理员登录</h2>
+      <form id="login-form"><label for="password">本地管理密码</label><input id="password" type="password" autocomplete="current-password" required><div class="actions"><button class="primary" type="submit">登录</button></div></form>
+      <p class="hint">此页面只在本地开发与测试环境开放。登录状态保存在 HttpOnly 会话 Cookie 中。</p>
+      <p id="login-status" class="status" role="status"></p>
+    </section>
+    <div id="workspace" hidden>
+      <div class="grid">
+        <div>
+          <section class="card">
+            <h2 id="editor-title">添加资料</h2>
+            <p class="hint">拖入或选择文件后自动识别基本信息并上传，默认仅自己预览。</p>
+            <form id="document-form">
+              <div id="drop" class="drop"><label for="file">拖入或选择 MD / TXT / PDF / DOCX 文件</label><input id="file" type="file" accept=".md,.txt,.pdf,.docx"><small id="file-name" class="hint">单个文件不超过 20 MB</small></div>
+              <details id="metadata-details" class="metadata">
+                <summary>查看或修改识别结果；也可粘贴文字</summary>
+                <p class="hint">文件名、文件修改日期及 MD/TXT 中的标题和作者会用于自动填写。无法确认作者时记为文件来源，不会自动认定是你的作品。展开后选择文件可先修改，再点提交。</p>
+                <label for="title">标题</label><input id="title" maxlength="240" required>
+                <div class="pair"><div><label for="project">项目</label><input id="project" maxlength="120"></div><div><label for="kind">资料类型</label><select id="kind"><option value="external_reference">外部参考资料</option><option value="project">我的项目资料</option></select></div></div>
+                <label for="author">作者 / 来源</label><input id="author" maxlength="240" required>
+                <div class="pair"><div><label for="source-date">资料日期</label><input id="source-date" type="date" required></div><div><label for="effective-at">生效日期</label><input id="effective-at" type="date" required></div></div>
+                <label for="visibility">可见性</label><select id="visibility"><option value="private_preview">仅自己预览</option><option value="public_answer">供访客回答</option></select>
+                <label for="text">粘贴文字</label><textarea id="text" placeholder="不选择文件时，可在这里粘贴资料正文"></textarea>
+                <div class="actions"><button id="submit" class="primary" type="submit">提交资料</button><button id="cancel-replace" type="button" hidden>取消替换</button></div>
+              </details>
+              <p id="editor-status" class="status" role="status"></p>
+            </form>
+          </section>
+          <section class="card" style="margin-top:20px">
+            <h2>我的 Agent</h2><p class="hint">登录后可连续提问，Agent 会查找你的私有资料并标出来源；对话只保留在当前页面。</p>
+            <div id="conversation" class="conversation" role="log" aria-label="我的 Agent 对话"></div>
+            <form id="preview-form"><label for="question">向 Agent 提问</label><textarea id="question" maxlength="2000" rows="2" placeholder="例如：毕业设计的流程是什么？" required></textarea><div class="actions"><button id="ask" class="primary" type="submit">发送</button><button id="clear-conversation" type="button">清空对话</button><label for="persona-mode" style="margin:0 0 0 auto">对话风格</label><select id="persona-mode" style="width:auto"><option value="professional">专业</option><option value="casual">轻松</option></select></div></form>
+            <p id="preview-status" class="status" role="status"></p>
+          </section>
+        </div>
+        <section class="card"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><h2>我的资料</h2><button id="refresh" type="button">刷新</button></div><p class="hint">任务状态每 3 秒刷新。失败或需要人工处理的资料可以修正后重试。</p><p id="list-status" class="status" role="status"></p><div id="documents"></div></section>
+      </div>
+    </div>
+  </main>
+  <script>
+    const base = "/api/v1/admin/kb";
+    const $ = (id) => document.getElementById(id);
+    let csrf = "";
+    let replacement = null;
+    let documents = [];
+    let refreshTimer = null;
+    let conversation = [];
+    let agentSessionId = crypto.randomUUID();
+    let conversationEpoch = 0;
+    function localDate(value) {
+      return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
+    }
+    const today = localDate(new Date());
+    $("source-date").value = today;
+    $("effective-at").value = today;
+    function status(id, message, error = false) { const el = $(id); el.textContent = message; el.classList.toggle("error", error); }
+    async function api(path, options = {}) {
+      const headers = { ...(options.headers || {}) };
+      if (options.body && typeof options.body === "string") headers["Content-Type"] = "application/json";
+      if (options.method && options.method !== "GET") headers["X-CSRF-Token"] = csrf;
+      const response = await fetch(base + path, { ...options, headers, credentials: "same-origin" });
+      if (response.status === 204) return null;
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error?.message || data.detail || `HTTP ${response.status}`);
+      return data;
+    }
+    function showWorkspace(on) {
+      $("login-panel").hidden = on; $("workspace").hidden = !on; $("logout").hidden = !on;
+      clearInterval(refreshTimer);
+      if (on) { loadDocuments(); refreshTimer = setInterval(loadDocuments, 3000); }
+    }
+    async function boot() {
+      try { const session = await api("/session"); csrf = session.csrf_token || ""; showWorkspace(session.authenticated); }
+      catch (error) { status("login-status", error.message, true); }
+    }
+    $("login-form").addEventListener("submit", async (event) => {
+      event.preventDefault(); status("login-status", "正在登录…");
+      try {
+        const result = await api("/login", { method: "POST", body: JSON.stringify({ password: $("password").value }) });
+        $("password").value = ""; csrf = result.csrf_token; status("login-status", ""); showWorkspace(true);
+      } catch (error) { status("login-status", error.message, true); }
+    });
+    $("logout").addEventListener("click", async () => {
+      try { await api("/logout", { method: "POST" }); } finally { csrf = ""; clearConversation(); showWorkspace(false); }
+    });
+    const drop = $("drop");
+    drop.addEventListener("dragover", (event) => { event.preventDefault(); drop.classList.add("drag"); });
+    drop.addEventListener("dragleave", () => drop.classList.remove("drag"));
+    drop.addEventListener("drop", (event) => {
+      event.preventDefault(); drop.classList.remove("drag");
+      if (event.dataTransfer.files.length) { $("file").files = event.dataTransfer.files; void selectFile(); }
+    });
+    $("file").addEventListener("change", () => { void selectFile(); });
+    function clean(value, limit) {
+      return String(value || "").trim().replace(/^['"]|['"]$/g, "").replace(/\s+/g, " ").slice(0, limit);
+    }
+    function knownDate(value) {
+      const match = String(value || "").trim().match(/^(\d{4})[-/.](\d{2})[-/.](\d{2})$/);
+      if (!match) return "";
+      const date = `${match[1]}-${match[2]}-${match[3]}`;
+      const parsed = new Date(`${date}T12:00:00`);
+      return !Number.isNaN(parsed.getTime()) && localDate(parsed) === date && date <= today ? date : "";
+    }
+    async function inferFileMetadata(file) {
+      const suffix = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+      const stem = file.name.replace(/\.[^.]+$/, "");
+      const fields = {};
+      let heading = "";
+      let byline = "";
+      if (suffix === ".md" || suffix === ".txt") {
+        const lines = (await file.slice(0, 65536).text()).replace(/^\uFEFF/, "").split(/\r?\n/);
+        if (lines[0]?.trim() === "---") {
+          const end = lines.slice(1, 41).findIndex((line) => line.trim() === "---");
+          if (end >= 0) for (const line of lines.slice(1, end + 1)) {
+            const pair = line.match(/^\s*([a-z_]+)\s*:\s*(.+)\s*$/i);
+            if (pair) fields[pair[1].toLowerCase()] = clean(pair[2], 240);
+          }
+        }
+        if (suffix === ".md") heading = lines.find((line) => /^#\s+\S/.test(line))?.replace(/^#\s+/, "") || "";
+        byline = lines.slice(0, 20).map((line) => line.match(/^(?:作者|Author|By)\s*[:：]\s*(.+)$/i)?.[1]).find(Boolean) || "";
+      }
+      const projectCode = stem.match(/^([a-z]{1,8}\d{1,4})(?=[ _.-])/i)?.[1] || "";
+      const modified = file.lastModified ? knownDate(localDate(new Date(file.lastModified))) : "";
+      return {
+        title: clean(fields.title || heading || stem.replace(/[_-]+/g, " "), 240) || "未命名资料",
+        project: clean(fields.project || projectCode, 120),
+        author: clean(fields.author || byline || `来源文件：${file.name}`, 240),
+        sourceDate: knownDate(fields.source_date || fields.date) || modified || today,
+        effectiveAt: knownDate(fields.effective_at) || today,
+      };
+    }
+    async function selectFile() {
+      const file = $("file").files[0];
+      if (!file) { $("file-name").textContent = "单个文件不超过 20 MB"; return; }
+      const suffix = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+      if (![".md", ".txt", ".pdf", ".docx"].includes(suffix) || !file.size || file.size > 20 * 1024 * 1024) {
+        $("file").value = "";
+        status("editor-status", "请选择不超过 20 MB 的 MD、TXT、PDF 或 DOCX 文件。", true);
+        return;
+      }
+      const reviewFirst = $("metadata-details").open || Boolean(replacement);
+      status("editor-status", "正在识别文件信息…");
+      try {
+        const info = await inferFileMetadata(file);
+        $("title").value = info.title; $("project").value = info.project;
+        $("author").value = info.author; $("source-date").value = info.sourceDate;
+        $("effective-at").value = info.effectiveAt;
+        if (!replacement) $("kind").value = "external_reference";
+        if (!reviewFirst) $("visibility").value = "private_preview";
+        $("text").value = "";
+        $("file-name").textContent = `${file.name} · 识别标题：${info.title}`;
+        if (reviewFirst) status("editor-status", "已自动填写资料信息；可修改后点击提交资料。");
+        else $("document-form").requestSubmit();
+      } catch (error) { status("editor-status", `无法识别文件信息：${error.message}`, true); }
+    }
+    $("kind").addEventListener("change", () => { $("author").placeholder = $("kind").value === "external_reference" ? "论文或资料原作者" : "你的名字"; });
+    async function uploadFile(file) {
+      const intent = await api("/uploads", { method: "POST", body: JSON.stringify({ filename: file.name, size: file.size }) });
+      await api(`/uploads/${intent.upload_id}`, { method: "PUT", headers: { "Content-Type": "application/octet-stream" }, body: file });
+      return intent.upload_id;
+    }
+    function clearEditor() {
+      replacement = null; $("editor-title").textContent = "添加资料"; $("submit").textContent = "提交资料";
+      $("cancel-replace").hidden = true; $("document-form").reset(); $("file-name").textContent = "单个文件不超过 20 MB";
+      $("metadata-details").open = false;
+      $("source-date").value = today; $("effective-at").value = today;
+    }
+    $("cancel-replace").addEventListener("click", clearEditor);
+    $("document-form").addEventListener("submit", async (event) => {
+      event.preventDefault(); const button = $("submit"); button.disabled = true; status("editor-status", "正在提交…");
+      try {
+        const file = $("file").files[0]; const text = $("text").value.trim();
+        if (Boolean(file) === Boolean(text)) throw new Error("请选择文件或填写文字，两者只选一种。");
+        const material = file ? { upload_id: await uploadFile(file) } : { text };
+        let path, payload;
+        if (replacement) {
+          path = `/documents/${replacement}/versions`;
+          payload = { source_date: $("source-date").value, effective_at: $("effective-at").value, ...material };
+        } else {
+          path = "/documents";
+          payload = { title: $("title").value.trim(), project: $("project").value.trim() || null,
+            fact_type: $("kind").value, author: $("author").value.trim(),
+            subject_relation: $("kind").value === "external_reference" ? "external_author" : "owner",
+            visibility: $("visibility").value, source_date: $("source-date").value,
+            effective_at: $("effective-at").value, ...material };
+        }
+        const result = await api(path, { method: "POST", body: JSON.stringify(payload) });
+        status("editor-status", `已提交任务 ${result.job_id}；处理完成后自动切换版本。`);
+        clearEditor(); await loadDocuments();
+      } catch (error) { status("editor-status", error.message, true); }
+      finally { button.disabled = false; }
+    });
+    const stage = { queued: "排队中", parsing: "解析中", chunking: "分块中", extracted: "等待索引", embedding: "向量化中", ready: "可用", needs_review: "需要人工处理", failed: "失败" };
+    const errorMessage = { DuplicatePreparedStatement: "本地数据库连接冲突；重启知识库后重试任务" };
+    function action(label, callback, cls = "") { const button = document.createElement("button"); button.type = "button"; button.textContent = label; button.className = cls; button.addEventListener("click", callback); return button; }
+    async function mutate(path, method = "POST") { await api(path, { method }); await loadDocuments(); }
+    async function loadDocuments() {
+      try { documents = await api("/documents"); renderDocuments(); status("list-status", documents.length ? "" : "还没有资料。"); }
+      catch (error) { status("list-status", error.message, true); }
+    }
+    function renderDocuments() {
+      const root = $("documents"); root.replaceChildren();
+      for (const doc of documents) {
+        const card = document.createElement("article"); card.className = "document";
+        const heading = document.createElement("h3"); heading.textContent = doc.title;
+        const badge = document.createElement("span"); badge.className = `badge ${doc.published ? "" : "private"}`; badge.textContent = doc.published ? "公开可答" : "未公开"; heading.append(badge); card.append(heading);
+        const meta = document.createElement("p"); meta.className = "meta";
+        meta.textContent = `${doc.project || "未分组"} · ${stage[doc.job_stage] || doc.job_stage || "未知状态"} · 生效 ${doc.effective_at || "—"}${doc.error_code ? " · " + (errorMessage[doc.error_code] || doc.error_code) : ""}`; card.append(meta);
+        const buttons = document.createElement("div"); buttons.className = "actions";
+        if (doc.latest_version_id) buttons.append(action("查看片段", async () => {
+          try {
+            const chunks = await api(`/documents/${doc.id}/versions/${doc.latest_version_id}/chunks`);
+            let box = card.querySelector("pre"); if (!box) { box = document.createElement("pre"); card.append(box); }
+            box.textContent = chunks.map((chunk) => `#${chunk.ordinal + 1} ${JSON.stringify(chunk.locations)}\n${chunk.body}`).join("\n\n") || "暂无提取片段";
+          } catch (error) { status("list-status", error.message, true); }
+        }));
+        if (doc.active_version_id) buttons.append(action("替换版本", () => {
+          replacement = doc.id; $("editor-title").textContent = `替换：${doc.title}`; $("submit").textContent = "提交新版本";
+          $("cancel-replace").hidden = false; $("metadata-details").open = true;
+          $("title").value = doc.title; $("project").value = doc.project || "";
+          $("author").value = doc.author; $("source-date").value = today; $("effective-at").value = today;
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }));
+        if (doc.active_version_id) buttons.append(action(doc.published ? "撤回公开" : "发布", async () => {
+          try { await mutate(`/documents/${doc.id}/${doc.published ? "unpublish" : "publish"}`); }
+          catch (error) { status("list-status", error.message, true); }
+        }));
+        if (["failed", "needs_review"].includes(doc.job_stage)) buttons.append(action("重试任务", async () => {
+          try { await mutate(`/jobs/${doc.job_id}/retry`); }
+          catch (error) { status("list-status", error.message, true); }
+        }));
+        buttons.append(action("删除", async () => {
+          if (!confirm(`删除“${doc.title}”？此操作会立即撤回资料。`)) return;
+          try { await mutate(`/documents/${doc.id}`, "DELETE"); }
+          catch (error) { status("list-status", error.message, true); }
+        }, "danger"));
+        card.append(buttons); root.append(card);
+      }
+    }
+    $("refresh").addEventListener("click", loadDocuments);
+    function clearConversation() {
+      conversation = [];
+      agentSessionId = crypto.randomUUID();
+      conversationEpoch++;
+      $("conversation").replaceChildren();
+      status("preview-status", "");
+    }
+    $("clear-conversation").addEventListener("click", clearConversation);
+    $("question").addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+        event.preventDefault(); $("preview-form").requestSubmit();
+      }
+    });
+    function addTurn(role, message, sources = []) {
+      const turn = document.createElement("div"); turn.className = `turn ${role}`;
+      const body = document.createElement("div"); body.textContent = message; turn.append(body);
+      if (sources.length) {
+        const list = document.createElement("div"); list.className = "sources";
+        for (const source of sources) {
+          const details = document.createElement("details");
+          const summary = document.createElement("summary"); summary.textContent = `${source.source_id} · ${source.title}`;
+          const location = document.createElement("p"); location.className = "meta";
+          location.textContent = (source.locations || []).map((item) => Object.entries(item).map(([key, value]) => `${key}: ${value}`).join(" · ")).join(" / ");
+          const snippet = document.createElement("p"); snippet.textContent = source.snippet;
+          details.append(summary, location, snippet); list.append(details);
+        }
+        turn.append(list);
+      }
+      $("conversation").append(turn); turn.scrollIntoView({ block: "nearest" });
+      return turn;
+    }
+    $("preview-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const message = $("question").value.trim(); if (!message || $("ask").disabled) return;
+      const history = conversation.slice(-10);
+      const epoch = conversationEpoch;
+      const pendingTurn = addTurn("user", message); $("question").value = "";
+      $("ask").disabled = true; status("preview-status", "正在查找资料并生成回答…");
+      try {
+        const result = await api("/preview", { method: "POST", body: JSON.stringify({
+          message, history, session_id: agentSessionId, locale: "zh-CN", persona_mode: $("persona-mode").value,
+        }) });
+        if (epoch !== conversationEpoch) return;
+        conversation.push({ role: "user", content: message }, { role: "assistant", content: result.reply });
+        addTurn("agent", result.reply, result.sources || []);
+        status("preview-status", `检索状态：${result.knowledge_status || "未知"}`);
+      } catch (error) {
+        if (epoch !== conversationEpoch) return;
+        pendingTurn.remove();
+        status("preview-status", `${error.message} 请确认本地回答模型已启动。`, true);
+        $("question").value = message;
+      } finally { $("ask").disabled = false; }
+    });
+    boot();
+  </script>
+</body>
+</html>

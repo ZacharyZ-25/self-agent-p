@@ -15,10 +15,10 @@ const mime = {
 const profile = {
   persona_version: "example-0.1.0",
   display_name: "Example Candidate",
-  title: "Fictional software engineering student",
+  title: "M.Sc. student · Autonomous Systems and AI",
   intro: {
-    zh: "我是一个完全虚构的示例候选人。",
-    en: "I am a completely fictional example candidate.",
+    zh: "我目前在 Example Institute 读机电一体化与信息技术硕士，方向是 Autonomous Systems and AI。",
+    en: "I am a Example Institute master’s student focused on autonomous systems, embodied AI, and robotics.",
   },
   avatar_url: null,
   quick_questions: {
@@ -26,9 +26,9 @@ const profile = {
     en: ["Could you introduce yourself?", "Which project represents you best?"],
   },
   contact: {
-    website: "https://example.com",
+    website: "https://example.org",
   },
-  disclaimer: "I am an AI twin built from Example Candidate’s approved public information. Verify important details with him.",
+  disclaimer: "I am an AI twin built from the owner’s approved public information. Verify important details with him.",
 };
 
 function json(response, status, body) {
@@ -89,7 +89,7 @@ async function streamReply(request, response, payload) {
       ? "Retry succeeded."
       : payload.persona_mode === "casual"
         ? "我平时喜欢足球、咖啡、音乐和 EA Sports FC。"
-        : "我是完全虚构的示例候选人。";
+        : "我在做具身智能与全栈 AI。";
   const first = event("delta", { text: text.slice(0, Math.ceil(text.length / 2)) });
   const marker = Buffer.from("具");
   const split = first.indexOf(marker);

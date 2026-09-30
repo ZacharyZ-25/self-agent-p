@@ -11,19 +11,33 @@ class BodyLimitExceeded(Exception):
 
 
 class BodyLimitMiddleware:
-    def __init__(self, app: ASGIApp, max_bytes: int) -> None:
+    def __init__(
+        self, app: ASGIApp, max_bytes: int, admin_upload_max_bytes: int = 21 * 1024 * 1024
+    ) -> None:
         self.app = app
         self.max_bytes = max_bytes
+        self.admin_upload_max_bytes = admin_upload_max_bytes
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
+        path = scope.get("path", "")
+        method = scope.get("method", "")
+        limit = self.max_bytes
+        if path.startswith("/api/v1/admin/kb/") and (
+            (method == "PUT" and "/uploads/" in path)
+            or (
+                method == "POST"
+                and (path == "/api/v1/admin/kb/documents" or path.endswith("/versions"))
+            )
+        ):
+            limit = self.admin_upload_max_bytes
         headers = {key.lower(): value for key, value in scope.get("headers", [])}
         content_length = headers.get(b"content-length")
         if content_length:
             try:
-                if int(content_length) > self.max_bytes:
+                if int(content_length) > limit:
                     await self._reject(scope, receive, send)
                     return
             except ValueError:
@@ -36,7 +50,7 @@ class BodyLimitMiddleware:
             message = await receive()
             if message["type"] == "http.request":
                 consumed += len(message.get("body", b""))
-                if consumed > self.max_bytes:
+                if consumed > limit:
                     raise BodyLimitExceeded
             return message
 

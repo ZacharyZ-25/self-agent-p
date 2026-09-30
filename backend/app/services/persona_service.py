@@ -11,7 +11,7 @@ from pydantic import ValidationError
 from app.models.persona import PersonaManifest, PersonaValidationReport
 
 FULL_DISCLAIMER = (
-    "我是根据所配置 Persona 构建的 AI 数字分身，使用第一人称回答。"
+    "我是基于本人已确认公开资料和聊天风格构建的 AI 数字分身，会用第一人称模拟表达。"
     "回答由 AI 生成，可能存在错误，不代表本人的实时立场、承诺或决定；"
     "重要事项请通过公开联系方式向本人确认。"
 )
@@ -56,11 +56,11 @@ class PersonaSnapshot:
         contact = self.profile.get("contact", {})
         return {
             "persona_version": self.persona_version,
-            "display_name": identity.get("display_name", "Example Candidate"),
-            "title": identity.get("current_status", ""),
+            "display_name": identity.get("display_name", "AI Assistant"),
+            "title": identity.get("stable_title", identity.get("current_status", "")),
             "intro": {
-                "zh": identity.get("one_line_intro_zh", ""),
-                "en": identity.get("one_line_intro_en", ""),
+                "zh": identity.get("stable_intro_zh", identity.get("one_line_intro_zh", "")),
+                "en": identity.get("stable_intro_en", identity.get("one_line_intro_en", "")),
             },
             "avatar_url": None,
             "quick_questions": {
@@ -198,14 +198,31 @@ class PersonaService:
         voice_rules = self._load_yaml("voice_rules.yaml", errors)
         boundaries = self._load_yaml("boundaries.yaml", errors)
 
+        schema = manifest.schema_version if manifest else 1
         for name, document in (
             ("profile.yaml", profile),
             ("projects.yaml", projects),
             ("voice_rules.yaml", voice_rules),
             ("boundaries.yaml", boundaries),
         ):
-            if document is not None and document.get("schema_version") != 1:
-                errors.append(f"{name} must declare schema_version: 1")
+            if document is not None and document.get("schema_version") != schema:
+                errors.append(f"{name} must declare schema_version: {schema}")
+
+        if schema == 2:
+            if manifest and manifest.facts_policy != "knowledge_base":
+                errors.append("Schema 2 requires facts_policy: knowledge_base")
+            identity = (profile or {}).get("identity", {})
+            if any(key in identity for key in (
+                "current_status", "one_line_intro_zh", "one_line_intro_en"
+            )) or "career" in (profile or {}) or "learning" in (profile or {}).get("skills", {}):
+                errors.append("Schema 2 dynamic profile facts must live in the knowledge base")
+            if any("current_thesis" in entry or "expected_graduation" in entry
+                   for entry in (profile or {}).get("education", []) if isinstance(entry, dict)):
+                errors.append(
+                    "Schema 2 thesis and graduation plans must live in the knowledge base"
+                )
+            if (projects or {}).get("projects") != []:
+                errors.append("Schema 2 projects must live in the knowledge base")
 
         if voice_rules is not None and voice_rules.get("perspective") != "first_person":
             errors.append("voice_rules.perspective must be first_person")
@@ -216,11 +233,13 @@ class PersonaService:
 
         if system_prompt and "第一人称" not in system_prompt:
             errors.append("system_prompt.md must contain the first-person rule")
-        if qa_count < 30:
-            completion_issues.append(f"Q&A coverage is incomplete: {qa_count}/30 minimum")
+        minimum_qa = 3 if schema == 2 else 30
+        if qa_count < minimum_qa:
+            completion_issues.append(f"Q&A coverage is incomplete: {qa_count}/{minimum_qa} minimum")
 
-        self._check_profile_completeness(profile, completion_issues)
-        self._check_projects_completeness(projects, completion_issues)
+        self._check_profile_completeness(profile, completion_issues, schema=schema)
+        if schema == 1:
+            self._check_projects_completeness(projects, completion_issues)
         self._check_voice_completeness(voice_rules, completion_issues)
         if qa_pairs and self._contains_placeholder(qa_pairs):
             completion_issues.append("qa_pairs.md still contains draft placeholders")
@@ -271,7 +290,7 @@ class PersonaService:
         return content
 
     def _check_profile_completeness(
-        self, profile: dict[str, Any] | None, issues: list[str]
+        self, profile: dict[str, Any] | None, issues: list[str], *, schema: int = 1
     ) -> None:
         if profile is None:
             return
@@ -286,6 +305,12 @@ class PersonaService:
             "skills": [*(skills.get("expert") or []), *(skills.get("proficient") or [])],
             "career.target_roles": career.get("target_roles"),
         }
+        if schema == 2:
+            required.pop("identity.current_status")
+            required.pop("career.target_roles")
+            required["identity.stable_title"] = identity.get("stable_title")
+            required["identity.stable_intro_zh"] = identity.get("stable_intro_zh")
+            required["identity.stable_intro_en"] = identity.get("stable_intro_en")
         for field, value in required.items():
             if not value or self._contains_placeholder(value):
                 issues.append(f"Required profile field is incomplete: {field}")

@@ -17,3 +17,10 @@ playwright-report/
 test-results/
 *.log
 .DS_Store
+
+# Local knowledge, migration backups, model downloads and caches
+persona/
+knowledge-data/
+local-model/
+node_modules/
+*.log
