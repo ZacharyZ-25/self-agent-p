@@ -724,25 +724,54 @@ def resolve_response_language(message: str, locale: str | None) -> str:
 
 def needs_education_anchor(message: str) -> bool:
     lowered = message.casefold()
-    return any(term in lowered for term in INTRODUCTION_OR_EDUCATION_TERMS)
+    return not _asks_knowledge_facts(message) and any(
+        term in lowered for term in INTRODUCTION_OR_EDUCATION_TERMS
+    )
 
 
-def is_core_identity_question(message: str) -> bool:
+def _asks_knowledge_facts(message: str) -> bool:
+    """Degree words in a technical question do not make it an identity question."""
     lowered = message.casefold()
-    if any(
+    return any(
         term in lowered
         for term in (
             "项目",
             "研究",
             "进度",
             "论文",
+            "毕设",
+            "毕业设计",
+            "算法",
+            "识别",
+            "实验",
+            "性能",
+            "结果",
+            "实现",
             "project",
             "research",
             "paper",
+            "thesis",
+            "dissertation",
+            "algorithm",
+            "recognition",
+            "experiment",
+            "performance",
+            "result",
+            "implement",
             "projekt",
             "forschung",
+            "abschlussarbeit",
+            "bachelorarbeit",
+            "masterarbeit",
+            "ergebnis",
+            "versuch",
         )
-    ):
+    )
+
+
+def is_core_identity_question(message: str) -> bool:
+    lowered = message.casefold()
+    if _asks_knowledge_facts(message):
         return False
     if is_education_identity_question(message):
         return True
@@ -791,10 +820,7 @@ def is_core_identity_question(message: str) -> bool:
 
 def is_education_identity_question(message: str) -> bool:
     lowered = message.casefold()
-    if any(
-        term in lowered
-        for term in ("项目", "研究", "论文", "project", "research", "paper", "projekt", "forschung")
-    ):
+    if _asks_knowledge_facts(message):
         return False
     personal = any(term in lowered for term in ("你", "your", "you", "dein", "du "))
     education = any(

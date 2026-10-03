@@ -15,7 +15,7 @@ This public repository contains reusable code and fictional examples. Example Ca
 - **Professional and casual modes:** separate conversations for work/project questions and everyday conversation.
 - **Versioned Persona:** structured background, speaking style, first-person instructions, reference Q&A, and response boundaries.
 - **Website chat:** a standalone landing page and a dependency-free Web Component with Shadow DOM.
-- **Conversation controls:** streamed replies, stop/retry, JSON fallback, session restore and reset.
+- **Conversation controls:** streamed replies, stop/retry, session restore and reset. The API also supports JSON replies.
 - **Interface options:** Chinese, English, and German; light/dark themes; mobile layout and keyboard controls.
 - **Model choice:** DeepSeek, OpenAI-compatible APIs, and compatible local or remote llama.cpp servers.
 - **FastAPI backend:** public profile, JSON/SSE chat, bounded history, request IDs, rate limits, and metrics without raw conversation logging.

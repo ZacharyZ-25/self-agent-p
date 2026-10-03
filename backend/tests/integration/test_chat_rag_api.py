@@ -21,7 +21,12 @@ from app.knowledge.retriever import Evidence
 from app.main import create_app
 from app.models.chat import ChatRequest, source_from_evidence
 from app.models.common import TokenUsage
-from app.services.chat_service import AnswerContext
+from app.services.chat_service import (
+    AnswerContext,
+    is_core_identity_question,
+    is_education_identity_question,
+    needs_education_anchor,
+)
 from app.services.deepseek_client import (
     ProviderDelta,
     ProviderDone,
@@ -567,3 +572,85 @@ def test_core_identity_does_not_receive_unrelated_retrieved_sources(in_progress_
     assert "尚未毕业" in response.json()["reply"]
     assert not any(evidence.body in message["content"] for message in provider.messages)
     assert provider.calls == 0
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "你的本科手势识别智能小车使用了哪些算法，识别结果如何？",
+        "你的本科毕设用了什么方法？",
+        "你的毕业设计有什么实验结果？",
+        "你的本科方案是怎样实现的？",
+        "What algorithms did you use for gesture recognition in your bachelor's thesis?",
+        "Welche Algorithmen verwendet deine Bachelorarbeit und welche Ergebnisse gibt es?",
+    ],
+)
+def test_degree_related_technical_questions_keep_knowledge_in_both_transports(
+    question: str,
+) -> None:
+    assert not is_core_identity_question(question)
+    assert not is_education_identity_question(question)
+    assert not needs_education_anchor(question)
+    evidence = replace(
+        sample_evidence(),
+        title="Fictional undergraduate gesture-control project",
+        body="The fictional project used Algorithm-A and recognized 46 of 50 gestures.",
+    )
+    provider = FakeProvider("The project used Algorithm-A with 46/50 recognized gestures.[S1]")
+    app = create_app(
+        Settings(app_env="test", rag_enabled=True),
+        provider=provider,
+        knowledge=FakeKnowledgeAccess(evidence=evidence),
+    )
+
+    with TestClient(app) as client:
+        response = client.post("/api/v1/chat", json={"message": question})
+        streamed = client.post("/api/v1/chat/stream", json={"message": question})
+
+    assert response.status_code == streamed.status_code == 200
+    assert provider.calls == 2
+    assert response.json()["model"] == "fake-model"
+    assert response.json()["reply"] == provider.reply
+    assert response.json()["sources"][0]["source_id"] == "S1"
+    assert any(evidence.body in message["content"] for message in provider.messages)
+    events = parse_sse(streamed.text)
+    assert events[1][1]["sources"][0]["source_id"] == "S1"
+    assert events[-1][1]["source_ids"] == ["S1"]
+    assert "".join(data["text"] for name, data in events if name == "delta") == provider.reply
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "你毕业了吗？",
+        "你的本科和硕士教育背景是什么？",
+        "你的硕士学位是系统工程吗？",
+        "Have you graduated from your master's degree?",
+        "What is your master's degree in Intelligent Systems?",
+        "Wo studierst du und welcher Abschluss ist verbindlich?",
+    ],
+)
+def test_actual_degree_questions_still_use_persona_without_retrieved_sources(
+    question: str, in_progress_persona,
+) -> None:
+    assert is_core_identity_question(question)
+    assert is_education_identity_question(question)
+    provider = FakeProvider("The retrieved project falsely claims a completed doctorate.[S1]")
+    app = create_app(
+        Settings(app_env="test", rag_enabled=True, persona_dir=in_progress_persona),
+        provider=provider,
+        knowledge=FakeKnowledgeAccess(),
+    )
+
+    with TestClient(app) as client:
+        response = client.post("/api/v1/chat", json={"message": question})
+        streamed = client.post("/api/v1/chat/stream", json={"message": question})
+
+    assert response.status_code == streamed.status_code == 200
+    assert response.json()["model"] == "persona-fact"
+    assert response.json()["sources"] == []
+    assert "completed doctorate" not in response.json()["reply"]
+    assert provider.calls == 0
+    events = parse_sse(streamed.text)
+    assert events[1][1]["sources"] == []
+    assert events[-1][1]["source_ids"] == []

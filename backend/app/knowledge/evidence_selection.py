@@ -22,7 +22,44 @@ _OVERVIEW = re.compile(
 )
 _NUMERIC_ALTERNATIVE = re.compile(r"还是|\bor\b|\boder\b", re.IGNORECASE)
 _COUNT_QUESTION = re.compile(r"多少|几次|\bhow many\b|\bwie viele\b", re.IGNORECASE)
-_DATE = re.compile(r"\b20\d{2}-\d{1,2}-\d{1,2}\b")
+_RESULT_QUESTION = re.compile(
+    r"结果|效果|性能|精度|准确率|识别率|表现|成功|"
+    r"\bresults?\b|\boutcomes?\b|\bperformance\b|\baccuracy\b|\bsuccess\w*\b|"
+    r"ergebnis|genauigkeit|präzision|leistung",
+    re.IGNORECASE,
+)
+_RESULT_SECTION = re.compile(
+    r"总结|结论|小结|实验|结果|测试|评估|"
+    r"\bresults?\b|\bconclusions?\b|\bsummary\b|\bevaluation\b|\bvalidation\b|"
+    r"ergebnis|fazit|auswertung|zusammenfassung",
+    re.IGNORECASE,
+)
+_BACKGROUND_SECTION = re.compile(
+    r"背景|意义|研究现状|相关工作|理论|概况|"
+    r"\bbackground\b|\brelated work\b|\bintroduction\b|\bmotivation\b|"
+    r"\bliterature\b|grundlage|einleitung",
+    re.IGNORECASE,
+)
+_RESULT_TEXT = re.compile(
+    r"结果|精度|准确率|吞吐量|成功|mAP|"
+    r"\bresults?\b|\baccuracy\b|\bprecision\b|\brecall\b|\bthroughput\b|"
+    r"\bsuccess\w*\b|\bachieved\b|erreicht|genauigkeit|präzision",
+    re.IGNORECASE,
+)
+_MEASURED_VALUE = re.compile(
+    r"\d+(?:[.,]\d+)?\s*%|"
+    r"\d+\s*(?:/|out of|of|von)\s*\d+|"
+    r"\d+(?:[.,]\d+)?\s*(?:次|件|ms\b|fps\b|m/s\b|trials?\b|runs?\b)",
+    re.IGNORECASE,
+)
+_FUTURE_RESULT = re.compile(
+    r"计划|预期|预计|力争|希望|目标(?:是|为|达到|精度|准确率)|旨在|"
+    r"\b(?:aims?|planned|expected|hopes?|goals?)\b|"
+    r"\btarget\s+(?:accuracy|precision|performance|throughput|rate)\b|"
+    r"\b(?:ziel|geplant|erwartet|angestrebt)\b",
+    re.IGNORECASE,
+)
+_DATE = re.compile(r"(?<!\d)20\d{2}[-/]\d{1,2}[-/]\d{1,2}(?!\d)")
 _NUMBER = re.compile(r"\b\d+(?:[.,]\d+)?\b")
 _MIN_ASPECT_SIMILARITY = 0.18
 
@@ -48,6 +85,21 @@ def _cosine(left: list[float], right: list[float]) -> float:
     norm = math.sqrt(sum(value * value for value in left))
     norm *= math.sqrt(sum(value * value for value in right))
     return sum(a * b for a, b in zip(left, right, strict=True)) / norm if norm else 0.0
+
+
+def _measured_result_bonus(item: Evidence) -> float:
+    sections = " ".join(str(location.get("section", "")) for location in item.locations)
+    if _BACKGROUND_SECTION.search(sections):
+        return 0.0
+    result_section = bool(_RESULT_SECTION.search(sections))
+    for sentence in re.split(r"[。！？;；\n]|\.\s+", _DATE.sub("", item.body)):
+        if (
+            _MEASURED_VALUE.search(sentence)
+            and not _FUTURE_RESULT.search(sentence)
+            and (result_section or _RESULT_TEXT.search(sentence))
+        ):
+            return 0.16
+    return 0.0
 
 
 def select_answer_evidence(
@@ -112,7 +164,9 @@ def select_answer_evidence(
     for item, vector in zip(selected, body_vectors, strict=True):
         similarity = _cosine(query_vector, vector)
         count_bonus = 0.0
-        if _COUNT_QUESTION.search(query):
+        if _RESULT_QUESTION.search(query):
+            count_bonus = _measured_result_bonus(item)
+        elif _COUNT_QUESTION.search(query):
             numbers = _NUMBER.findall(_DATE.sub("", item.body))
             if len(numbers) >= 2:
                 count_bonus = 0.16
